@@ -6,17 +6,9 @@
 #include "polyscope/polyscope.h"
 #include "polyscope/surface_mesh.h"
 
-int main() {
-    //Options
-    polyscope::options::groundPlaneMode = polyscope::GroundPlaneMode::ShadowOnly;
-    polyscope::options::shadowBlurIters = 6;
-
-    //Initialize Polyscope
-    polyscope::init();
-
-    //Load Mesh
-    pmp::SurfaceMesh mesh;
-    pmp::read(mesh,"data/stanford-bunny.obj");
+//Feed a updated mesh to Polyscope, which can then be rendered
+void updatePolyscope(pmp::SurfaceMesh& mesh, std::string mesh_name) {
+    mesh.garbage_collection();
 
     //Convert to Polyscope format
     std::vector<glm::vec3> vertices;
@@ -34,8 +26,26 @@ int main() {
         faces.push_back(face_indices);
     }
 
+    polyscope::registerSurfaceMesh(mesh_name, vertices, faces);
+}
+
+int main() {
+    //Options
+    polyscope::options::groundPlaneMode = polyscope::GroundPlaneMode::ShadowOnly;
+    polyscope::options::shadowBlurIters = 6;
+
+    //Initialize Polyscope
+    polyscope::init();
+
+    //Load Mesh
+    pmp::SurfaceMesh mesh_high_quality_bunny, mesh_low_quality_bunny;
+    pmp::read(mesh_high_quality_bunny, "data/stanford-bunny.obj");
+    pmp::read(mesh_low_quality_bunny, "data/stanford-bunny-low.obj");
+
     //Render Mesh
-    polyscope::registerSurfaceMesh("test_mesh", vertices, faces);
+    updatePolyscope(mesh_high_quality_bunny, "stanford-bunny-high");
+    polyscope::getSurfaceMesh("stanford-bunny-high")->setEnabled(false);
+    updatePolyscope(mesh_low_quality_bunny, "stanford-bunny-low");
     polyscope::show();
 
     return 0;
