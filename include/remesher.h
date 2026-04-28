@@ -8,10 +8,42 @@ class Remesher {
 private: 
     pmp::SurfaceMesh& mesh;
     double target_length;
-    double l_max = 1.3333;
-    double l_min = 0.8;
+    const double l_max = 1.3333;
+    const double l_min = 0.8;
     double loss;
-    int iterations;
+    const int iterations;
+
+    /**
+     * \brief Gets the length of a single edge 
+     *
+     * \return The length value as a double.
+     */
+    double edge_length(pmp::Edge e);
+
+    /**
+     * \brief Calculates the average edge length in the mesh
+     *
+     * \return The average length value as a double.
+     */
+    double avg_edge_length();
+
+    /**
+     * \brief Gets the loss of a single edge 
+     *
+     * \return The loss value as a double.
+     */
+    double get_edge_loss(pmp::Edge e);
+
+    /**
+     * \brief Gets the ideal valence of a Vertex v. 
+     * 
+     * This is 6 for interior vertices and 4 for boundary vertices.
+     *
+     * \return The ideal valence as an integer.
+     */
+    int ideal_valence(pmp::Vertex v);
+
+    public:
 
     /**
      * \brief Splits long edges that exceed 4/3rds of the target length.
@@ -34,37 +66,11 @@ private:
     void smooth_vertices();
 
     /**
-     * \brief Gets the loss of a single edge 
-     *
-     * \return The loss value as a double.
-     */
-    double get_edge_loss(pmp::Edge e);
-
-    /**
-     * \brief Gets the ideal valence of a Vertex v. 
-     * 
-     * This is 6 for interior vertices and 4 for boundary vertices.
-     *
-     * \return The ideal valence as an integer.
-     */
-    int ideal_valence(pmp::Vertex v);
-
-public:
-    /**
      * \brief Gets the current total mesh loss / entropy. 
      *
      * \return The current loss value as a double.
      */
     double get_current_loss() const { return loss; }
-
-    /**
-     * \brief Performs isotropic remeshing on the surface mesh.
-     * 
-     * If the class was initialized with a set amount of iterations, 
-     * the single_iteration() function will be called that many times. Otherwise 
-     * it will continue untill the loss function has converged.
-     */
-    void remesh();
 
     /**
      * \brief Performs a single iteration of the isotropic remeshing algorithm
@@ -77,9 +83,23 @@ public:
      */
     void single_iteration();
 
+    /**
+     * \brief Performs isotropic remeshing on the surface mesh.
+     * 
+     * If the class was initialized with a set amount of iterations, 
+     * the single_iteration() function will be called that many times. Otherwise 
+     * it will continue untill the loss function has converged.
+     */
+    void remesh();
 
     Remesher(pmp::SurfaceMesh& m, double t, int i) : mesh(m), target_length(t), iterations(i) {}
     Remesher(pmp::SurfaceMesh& m, double t) : mesh(m), target_length(t), iterations(0) {}
+    Remesher(pmp::SurfaceMesh& m, int i) : mesh(m), iterations(i) {
+        target_length = avg_edge_length();
+    }
+    Remesher(pmp::SurfaceMesh& m) : mesh(m), iterations(0) {
+        target_length = avg_edge_length();
+    }
 };
 
-}
+} //namespace ba
