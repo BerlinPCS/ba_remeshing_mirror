@@ -65,7 +65,29 @@ void Remesher::split_long_edges(){
 }
 
 void Remesher::collapse_short_edges(){
-    // TODO - implement
+    //STILL NEED TO TEST
+
+    // Gather Relevant Edges to Collapse later
+    std::vector<pmp::Edge> edges_to_collapse;
+    for (auto e : mesh.edges()) {
+        if (edge_length(e) < target_length * l_min) {
+            edges_to_collapse.push_back(e);
+        }
+    }
+
+    std::cout << "Collapsing " << edges_to_collapse.size() << " short edges." << std::endl;
+
+    // Collapse gathered edges
+    for (auto e : edges_to_collapse) {
+        pmp::Halfedge h = mesh.halfedge(e, 0);
+        if (mesh.is_collapse_ok(h)) {
+            pmp::Vertex v_from = mesh.from_vertex(h);
+            pmp::Vertex v_to = mesh.to_vertex(h);
+            mesh.position(v_to) = 0.5 * (mesh.position(v_from) + mesh.position(v_to));
+
+            mesh.collapse(h);
+        }
+    }
 }
 
 void Remesher::flip_edges(){
