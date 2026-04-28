@@ -6,6 +6,8 @@
 #include "polyscope/polyscope.h"
 #include "polyscope/surface_mesh.h"
 
+#include "remesher.h"
+
 //Feed a updated mesh to Polyscope, which can then be rendered
 void updatePolyscope(pmp::SurfaceMesh& mesh, std::string mesh_name) {
     mesh.garbage_collection();

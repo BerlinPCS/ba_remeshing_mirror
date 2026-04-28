@@ -85,6 +85,7 @@ include_directories(include)
 add_executable(
     remesher 
     src/main.cpp
+    src/remesher.cpp
 )
 
 target_link_libraries(remesher PRIVATE pmp polyscope)
