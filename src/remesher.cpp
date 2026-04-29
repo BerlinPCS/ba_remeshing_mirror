@@ -65,7 +65,7 @@ void Remesher::split_long_edges(){
     std::cout << "Splitting " << edges_to_split.size() << " long edges." << std::endl;
 
     // Split gathered edges
-    for (auto e : edges_to_split) {
+    for(auto e : edges_to_split) {
         pmp::Vertex v0 = mesh.vertex(e, 0);
         pmp::Vertex v1 = mesh.vertex(e, 1);
 
@@ -82,7 +82,7 @@ void Remesher::split_long_edges(){
 void Remesher::collapse_short_edges(){
     // Gather Relevant Edges to Collapse later
     std::vector<pmp::Edge> edges_to_collapse;
-    for (auto e : mesh.edges()) {
+    for(auto e : mesh.edges()) {
         //Skip boundary edges for now
         if (!mesh.is_boundary(e) && edge_length(e) < target_length * l_min) {
             edges_to_collapse.push_back(e);
@@ -92,7 +92,7 @@ void Remesher::collapse_short_edges(){
     std::cout << "Collapsing " << edges_to_collapse.size() << " short edges." << std::endl;
 
     // Collapse gathered edges
-    for (auto e : edges_to_collapse) {
+    for(auto e : edges_to_collapse) {
         if (mesh.is_deleted(e)) continue;
         pmp::Halfedge h = mesh.halfedge(e, 0);
         pmp::Vertex v_from = mesh.from_vertex(h);
@@ -105,7 +105,7 @@ void Remesher::collapse_short_edges(){
 
             // Check if the collapse would create a long edge, which would result in a loop
             bool creates_long_edge = false;
-            for (auto v_n : mesh.vertices(v_from)) {
+            for(auto v_n : mesh.vertices(v_from)) {
                 if (pmp::distance(p_mid, mesh.position(v_n)) > target_length * l_max) {
                     creates_long_edge = true;
                     break;
@@ -113,7 +113,7 @@ void Remesher::collapse_short_edges(){
             }
 
             if(!creates_long_edge) {
-                for (auto v_n : mesh.vertices(v_from)) {
+                for(auto v_n : mesh.vertices(v_from)) {
                     if (pmp::distance(p_mid, mesh.position(v_n)) > target_length * l_max) {
                         creates_long_edge = true;
                         break;
@@ -132,7 +132,7 @@ void Remesher::collapse_short_edges(){
 void Remesher::flip_edges(){
     // Gather Relevant Edges to Check later
     std::vector<pmp::Edge> edges_to_check;
-    for (auto e : mesh.edges()) {
+    for(auto e : mesh.edges()) {
         if (mesh.is_flip_ok(e)) {
             edges_to_check.push_back(e);
         }

@@ -28,13 +28,6 @@ private:
     double avg_edge_length();
 
     /**
-     * \brief Gets the loss of a single edge 
-     *
-     * \return The loss value as a double.
-     */
-    double get_edge_loss(pmp::Edge e);
-
-    /**
      * \brief Gets the ideal valence of a Vertex v. 
      * 
      * This is 6 for interior vertices and 4 for boundary vertices.
@@ -58,6 +51,13 @@ private:
     pmp::Normal vertex_normal(pmp::Vertex v);
 
     public:
+
+    /**
+     * \brief Gets the loss of a single edge 
+     *
+     * \return The loss value as a double.
+     */
+    double get_edge_loss(pmp::Edge e);
 
     /**
      * \brief Splits long edges that exceed 4/3rds of the target length.
