@@ -50,6 +50,23 @@ int main() {
 
     //Load Mesh
     pmp::SurfaceMesh mesh;
+    std::vector<std::string> mesh_files = {
+        "data/stanford-bunny.obj",
+        "data/stanford-bunny-low.obj",
+        "data/test/test_split.obj",
+        "data/test/test_collapse.obj",
+        "data/test/test_flip.obj",
+        "data/test/test_smooth.obj"
+    };
+    std::vector<const char*> mesh_names = {
+        "High Quality Bunny",
+        "Low Quality Bunny",
+        "Test Split",
+        "Test Collapse",
+        "Test Flip",
+        "Test Smooth"
+    };
+    int selected_mesh = 0;
 
     /**
      * \brief Lambda Function to load a mesh based on a .obj, .stl, or .off file. 
@@ -74,20 +91,10 @@ int main() {
     //Create UI
     polyscope::state::userCallback = [&]() {
         ImGui::Text("Meshes:");
-        if (ImGui::Button("Hight Quality Bunny")) load_mesh("data/stanford-bunny.obj");
-        ImGui::SameLine();
-        if (ImGui::Button("Low Quality Bunny")) load_mesh("data/stanford-bunny-low.obj");
-
-        ImGui::Separator(); 
-
-        ImGui::Text("Test Cases:");
-        if (ImGui::Button("Load Split")) load_mesh("data/test/test_split.obj");
-        ImGui::SameLine();
-        if (ImGui::Button("Load Collapse")) load_mesh("data/test/test_collapse.obj");
-        ImGui::SameLine();
-        if (ImGui::Button("Load Flip")) load_mesh("data/test/test_flip.obj");
-        ImGui::SameLine();
-        if (ImGui::Button("Load Smooth")) load_mesh("data/test/test_smooth.obj");
+        ImGui::SetNextItemWidth(180.0f);
+        if (ImGui::Combo("##mesh_selector", &selected_mesh, mesh_names.data(), (int)mesh_names.size())) {
+            load_mesh(mesh_files[selected_mesh]);
+        }
 
         ImGui::Separator(); 
 
@@ -123,6 +130,14 @@ int main() {
         if (ImGui::Button("Remesh")) {
             remesher->remesh();
             update_polyscope(mesh); 
+        }
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(90.0);
+        if (remesher) {
+            int iterations_input = remesher->get_iterations();
+            if (ImGui::InputInt("Iterations", &iterations_input)) {
+                remesher->set_iterations(iterations_input);
+            }
         }
     };
 

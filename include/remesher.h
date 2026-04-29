@@ -11,7 +11,7 @@ private:
     const double l_max = 1.3333;
     const double l_min = 0.8;
     double loss;
-    const int iterations;
+    int iterations;
 
     /**
      * \brief Gets the length of a single edge 
@@ -88,6 +88,19 @@ private:
      * \return The current loss value as a double.
      */
     double get_current_loss() const { return loss; }
+
+    /**
+     * \brief Gets the current iteration count for the remeshing algorithm 
+     *
+     * \return The current iteration value as an integer.
+     */
+    int get_iterations() const { return iterations; }
+    
+    /**
+     * \brief Set the iteration count for the remeshing algortihm
+     * 0 means run until converged.
+     */
+    void set_iterations(double i) { iterations = i; }
 
     /**
      * \brief Performs a single iteration of the isotropic remeshing algorithm
