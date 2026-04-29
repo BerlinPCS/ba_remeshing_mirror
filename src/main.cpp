@@ -1,15 +1,17 @@
 #include <iostream>
+#include <memory>
 
 #include <pmp/surface_mesh.h>
 #include <pmp/io/io.h>
-
 #include "polyscope/polyscope.h"
 #include "polyscope/surface_mesh.h"
 
 #include "remesher.h"
 
+/*#define DISABLED false */
+
 //Feed a updated mesh to Polyscope, which can then be rendered
-void updatePolyscope(pmp::SurfaceMesh& mesh, std::string mesh_name) {
+void update_polyscope(pmp::SurfaceMesh& mesh/*, std::string mesh_name, bool enabled = true*/) {
     mesh.garbage_collection();
 
     //Convert to Polyscope format
@@ -28,7 +30,7 @@ void updatePolyscope(pmp::SurfaceMesh& mesh, std::string mesh_name) {
         faces.push_back(face_indices);
     }
 
-    polyscope::registerSurfaceMesh(mesh_name, vertices, faces);
+    polyscope::registerSurfaceMesh("mesh", vertices, faces); //->setEnabled(enabled);
 }
 
 int main() {
@@ -39,49 +41,89 @@ int main() {
     //Initialize Polyscope
     polyscope::init();
 
+    //Create Remesher.
+    std::unique_ptr<ba::Remesher> remesher;
+
     //Load Mesh
-    pmp::SurfaceMesh mesh_high_quality_bunny, mesh_low_quality_bunny, test;
-    pmp::read(mesh_high_quality_bunny, "data/stanford-bunny.obj");
-    pmp::read(mesh_low_quality_bunny, "data/stanford-bunny-low.obj");
-    pmp::read(test, "data/test.obj");
+    pmp::SurfaceMesh mesh;
 
-    //Create Remesher
-    ba::Remesher remesher(test, 1.0, 2);
-
-    //Render Mesh
-    updatePolyscope(mesh_high_quality_bunny, "stanford-bunny-high");
-    polyscope::getSurfaceMesh("stanford-bunny-high")->setEnabled(false);
-    updatePolyscope(mesh_low_quality_bunny, "stanford-bunny-low");
-    polyscope::getSurfaceMesh("stanford-bunny-low")->setEnabled(false);
-    updatePolyscope(test, "test");
+    /**
+     * \brief Lambda Function to load a mesh based on .obj, .stl, or .off file. 
+     * Creates a new remesher instance for the loaded mesh.
+     * 
+     * \param filepath The path to the mesh file.
+     * \param length The target edge length for remeshing. Optional, if not included, uses average mesh edge length.
+     * \param iterations The number of iterations for remeshing. Optional, if not included, bases iterations off loss.
+     */
+    auto load_mesh = [&](const std::string& filepath, double length = 0, int iterations = 0) {
+        mesh.clear();
+        pmp::read(mesh, filepath);
+        
+        if(length && iterations) remesher = std::make_unique<ba::Remesher>(mesh, length, iterations);
+        else if (length) remesher = std::make_unique<ba::Remesher>(mesh, length);
+        else if (iterations) remesher = std::make_unique<ba::Remesher>(mesh, iterations);
+        else remesher = std::make_unique<ba::Remesher>(mesh);
+        
+        update_polyscope(mesh);
+        polyscope::getSurfaceMesh("mesh")->setEdgeWidth(1.0);
+    };
 
     //Create UI
     polyscope::state::userCallback = [&]() {
-        if (ImGui::Button("Run 1 Iteration")) {
-            remesher.single_iteration();
-            updatePolyscope(test, "test"); 
-        }
+        ImGui::Text("Meshes:");
+        if (ImGui::Button("Hight Quality Bunny")) load_mesh("data/stanford-bunny.obj");
+        ImGui::SameLine();
+        if (ImGui::Button("Low Quality Bunny")) load_mesh("data/stanford-bunny-low.obj");
 
+        ImGui::Separator(); 
+
+        ImGui::Text("Test Cases:");
+        if (ImGui::Button("Load Split")) load_mesh("data/test/test_split.obj");
+        ImGui::SameLine();
+        if (ImGui::Button("Load Collapse")) load_mesh("data/test/test_collapse.obj");
+        ImGui::SameLine();
+        if (ImGui::Button("Load Flip")) load_mesh("data/test/test_flip.obj");
+        ImGui::SameLine();
+        if (ImGui::Button("Load Smooth")) load_mesh("data/test/test_smooth.obj");
+
+        ImGui::Separator(); 
+
+        ImGui::Text("Single Operations:");
         if (ImGui::Button("Split Long Edges")) {
-            remesher.split_long_edges();
-            updatePolyscope(test, "test"); 
+            remesher->split_long_edges();
+            update_polyscope(mesh); 
         }
-
+        ImGui::SameLine();
         if (ImGui::Button("Collapse Short Edges")) {
-            remesher.collapse_short_edges();
-            updatePolyscope(test, "test"); 
+            remesher->collapse_short_edges();
+            update_polyscope(mesh); 
         }
-
+        ImGui::SameLine();
         if (ImGui::Button("Flip Edges")) {
-            remesher.flip_edges();
-            updatePolyscope(test, "test"); 
+            remesher->flip_edges();
+            update_polyscope(mesh); 
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Smooth Vertices")) {
+            remesher->smooth_vertices();
+            update_polyscope(mesh); 
         }
 
-        if (ImGui::Button("Smooth Vertices")) {
-            remesher.smooth_vertices();
-            updatePolyscope(test, "test"); 
+        ImGui::Separator();
+
+        ImGui::Text("Remeshing:");
+        if (ImGui::Button("Run 1 Iteration")) {
+            remesher->single_iteration();
+            update_polyscope(mesh); 
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Remesh")) {
+            remesher->remesh();
+            update_polyscope(mesh); 
         }
     };
+
+    load_mesh("data/stanford-bunny.obj");
     polyscope::show();
 
     return 0;
