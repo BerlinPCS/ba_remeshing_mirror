@@ -37,6 +37,22 @@ int Remesher::ideal_valence(pmp::Vertex v) {
     return 6;
 }
 
+pmp::Normal Remesher::face_normal(pmp::Face f) {
+    std::vector<pmp::Point> points;
+    for(auto v : mesh.vertices(f)) {
+        points.push_back(mesh.position(v));
+    }
+    return pmp::cross(points[1] - points[0], points[2] - points[0]);
+}
+
+pmp::Normal Remesher::vertex_normal(pmp::Vertex v) {
+    pmp::Normal normal(0, 0, 0);
+    for(auto f : mesh.faces(v)) {
+        normal += face_normal(f);
+    }
+    return pmp::normalize(normal);
+}
+
 void Remesher::split_long_edges(){
     // Gather Relevant Edges to Split later
     std::vector<pmp::Edge> edges_to_split;
@@ -67,7 +83,8 @@ void Remesher::collapse_short_edges(){
     // Gather Relevant Edges to Collapse later
     std::vector<pmp::Edge> edges_to_collapse;
     for (auto e : mesh.edges()) {
-        if (edge_length(e) < target_length * l_min) {
+        //Skip boundary edges for now
+        if (!mesh.is_boundary(e) && edge_length(e) < target_length * l_min) {
             edges_to_collapse.push_back(e);
         }
     }
@@ -76,6 +93,7 @@ void Remesher::collapse_short_edges(){
 
     // Collapse gathered edges
     for (auto e : edges_to_collapse) {
+        if (mesh.is_deleted(e)) continue;
         pmp::Halfedge h = mesh.halfedge(e, 0);
         if (mesh.is_collapse_ok(h)) {
             pmp::Vertex v_from = mesh.from_vertex(h);
@@ -88,7 +106,18 @@ void Remesher::collapse_short_edges(){
 }
 
 void Remesher::flip_edges(){
-    for(auto e : mesh.edges()) {
+    // Gather Relevant Edges to Check later
+    std::vector<pmp::Edge> edges_to_check;
+    for (auto e : mesh.edges()) {
+        if (mesh.is_flip_ok(e)) {
+            edges_to_check.push_back(e);
+        }
+    }
+
+    std::cout << "Checking " << edges_to_check.size() << " edges for flip." << std::endl;
+
+    for(auto e : edges_to_check) {
+        if (!mesh.is_flip_ok(e)) continue;
         pmp::Vertex v1 = mesh.vertex(e, 0);
         pmp::Vertex v2 = mesh.vertex(e, 1);
         pmp::Vertex w1 = mesh.to_vertex(mesh.next_halfedge(mesh.halfedge(e, 0)));
@@ -113,8 +142,36 @@ void Remesher::flip_edges(){
     }
 }
 
+//Based off https://stanford-cs248.github.io/Cardinal3D/meshedit/global/remesh/
+//Didn't add the part where the vertexes get moved gently
 void Remesher::smooth_vertices(){
-    // TODO - implement
+    auto v_new = mesh.add_vertex_property<pmp::vec3>("v:new", pmp::vec3(0,0,0));
+
+    for(auto v : mesh.vertices()) {
+        // Do not smooth boundary vertexes
+        if(mesh.is_boundary(v)) continue;
+
+        // Get center of neighbours
+        pmp::Point center(0, 0, 0);
+        for(auto v : mesh.vertices(v)){
+            center += mesh.position(v);
+        }
+        center /= mesh.valence(v);
+
+        // Calculate the new position
+        pmp::vec3 dir = center - mesh.position(v);
+        pmp::Normal normal = vertex_normal(v);
+        v_new[v] = dir - pmp::dot(dir, normal) * normal;
+    }
+
+    // Update vertex positions all at once
+    for(auto v : mesh.vertices()){
+        if(!mesh.is_boundary(v)) {
+            mesh.position(v) += v_new[v];
+        }
+    }
+
+    mesh.remove_vertex_property(v_new);
 }
 
 void Remesher::single_iteration(){

@@ -43,6 +43,20 @@ private:
      */
     int ideal_valence(pmp::Vertex v);
 
+    /**
+     * \brief Gets the area of a Face f. 
+     *
+     * \return The area as a double.
+     */
+    pmp::Normal face_normal(pmp::Face f);
+
+    /**
+     * \brief Gets the normal of a Vertex v based on the surrounding face normals (weighted). 
+     *
+     * \return The normal as a pmp::Normal.
+     */
+    pmp::Normal vertex_normal(pmp::Vertex v);
+
     public:
 
     /**
