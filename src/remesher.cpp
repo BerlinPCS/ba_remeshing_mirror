@@ -95,11 +95,35 @@ void Remesher::collapse_short_edges(){
     for (auto e : edges_to_collapse) {
         if (mesh.is_deleted(e)) continue;
         pmp::Halfedge h = mesh.halfedge(e, 0);
-        if (mesh.is_collapse_ok(h)) {
-            pmp::Vertex v_from = mesh.from_vertex(h);
-            pmp::Vertex v_to = mesh.to_vertex(h);
-            mesh.position(v_to) = 0.5 * (mesh.position(v_from) + mesh.position(v_to));
+        pmp::Vertex v_from = mesh.from_vertex(h);
+        pmp::Vertex v_to = mesh.to_vertex(h);
 
+        if(mesh.is_boundary(v_from) || mesh.is_boundary(v_to)) continue;
+        
+        if (mesh.is_collapse_ok(h)) {
+            pmp::Point p_mid = 0.5 * (mesh.position(v_from) + mesh.position(v_to));
+
+            // Check if the collapse would create a long edge, which would result in a loop
+            bool creates_long_edge = false;
+            for (auto v_n : mesh.vertices(v_from)) {
+                if (pmp::distance(p_mid, mesh.position(v_n)) > target_length * l_max) {
+                    creates_long_edge = true;
+                    break;
+                }
+            }
+
+            if(!creates_long_edge) {
+                for (auto v_n : mesh.vertices(v_from)) {
+                    if (pmp::distance(p_mid, mesh.position(v_n)) > target_length * l_max) {
+                        creates_long_edge = true;
+                        break;
+                    }
+                }
+            }
+
+            if (creates_long_edge) continue;
+
+            mesh.position(v_to) = p_mid;
             mesh.collapse(h);
         }
     }
@@ -114,7 +138,7 @@ void Remesher::flip_edges(){
         }
     }
 
-    std::cout << "Checking " << edges_to_check.size() << " edges for flip." << std::endl;
+    std::cout << "Checking " << edges_to_check.size() << " edges to flip." << std::endl;
 
     for(auto e : edges_to_check) {
         if (!mesh.is_flip_ok(e)) continue;
@@ -170,6 +194,8 @@ void Remesher::smooth_vertices(){
             mesh.position(v) += v_new[v];
         }
     }
+
+    std::cout << "Smoothed vertices." << std::endl;
 
     mesh.remove_vertex_property(v_new);
 }
