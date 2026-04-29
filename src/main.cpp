@@ -8,10 +8,14 @@
 
 #include "remesher.h"
 
-/*#define DISABLED false */
-
-//Feed a updated mesh to Polyscope, which can then be rendered
-void update_polyscope(pmp::SurfaceMesh& mesh/*, std::string mesh_name, bool enabled = true*/) {
+/**
+ * \brief Loads the given pmp::SurfaceMesh into Polyscope.
+ * Converts the halfedge data structure to the format expected by Polyscope.
+ * 
+ * \param mesh The mesh to be loaded into Polyscope
+ * \param mesh_name The name to be given to the mesh in Polyscope
+ */
+polyscope::SurfaceMesh* update_polyscope(pmp::SurfaceMesh& mesh, std::string mesh_name = "mesh") {
     mesh.garbage_collection();
 
     //Convert to Polyscope format
@@ -30,7 +34,7 @@ void update_polyscope(pmp::SurfaceMesh& mesh/*, std::string mesh_name, bool enab
         faces.push_back(face_indices);
     }
 
-    polyscope::registerSurfaceMesh("mesh", vertices, faces); //->setEnabled(enabled);
+    return polyscope::registerSurfaceMesh(mesh_name, vertices, faces);
 }
 
 int main() {
@@ -48,7 +52,7 @@ int main() {
     pmp::SurfaceMesh mesh;
 
     /**
-     * \brief Lambda Function to load a mesh based on .obj, .stl, or .off file. 
+     * \brief Lambda Function to load a mesh based on a .obj, .stl, or .off file. 
      * Creates a new remesher instance for the loaded mesh.
      * 
      * \param filepath The path to the mesh file.
@@ -64,8 +68,7 @@ int main() {
         else if (iterations) remesher = std::make_unique<ba::Remesher>(mesh, iterations);
         else remesher = std::make_unique<ba::Remesher>(mesh);
         
-        update_polyscope(mesh);
-        polyscope::getSurfaceMesh("mesh")->setEdgeWidth(1.0);
+        update_polyscope(mesh)->setEdgeWidth(1.0);
     };
 
     //Create UI
