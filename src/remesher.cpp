@@ -17,7 +17,6 @@ double Remesher::avg_edge_length() {
     double avg_length = 0.0;
     for(auto e : mesh.edges()) {
         avg_length += edge_length(e);
-        std::cout << "Average Edge Length: " << edge_length(e) << std::endl;
     }
     avg_length /= mesh.n_edges();
     std::cout << "Average Edge Length: " << avg_length << std::endl;
@@ -65,8 +64,6 @@ void Remesher::split_long_edges(){
 }
 
 void Remesher::collapse_short_edges(){
-    //STILL NEED TO TEST
-
     // Gather Relevant Edges to Collapse later
     std::vector<pmp::Edge> edges_to_collapse;
     for (auto e : mesh.edges()) {
@@ -91,7 +88,29 @@ void Remesher::collapse_short_edges(){
 }
 
 void Remesher::flip_edges(){
-    // TODO - implement
+    for(auto e : mesh.edges()) {
+        pmp::Vertex v1 = mesh.vertex(e, 0);
+        pmp::Vertex v2 = mesh.vertex(e, 1);
+        pmp::Vertex w1 = mesh.to_vertex(mesh.next_halfedge(mesh.halfedge(e, 0)));
+        pmp::Vertex w2 = mesh.to_vertex(mesh.next_halfedge(mesh.halfedge(e, 1)));
+
+        int v1_v = mesh.valence(v1);
+        int v2_v = mesh.valence(v2);
+        int w1_v = mesh.valence(w1);
+        int w2_v = mesh.valence(w2);
+
+        // Use squared loss to heavily penalize bad vertices.
+        // Alternatively use abs instead
+        int d = pow(v1_v - ideal_valence(v1), 2) + pow(v2_v - ideal_valence(v2), 2) + 
+                pow(w1_v - ideal_valence(w1), 2) + pow(w2_v - ideal_valence(w2), 2);
+
+        int d_ = pow(v1_v-1 - ideal_valence(v1), 2) + pow(v2_v-1 - ideal_valence(v2), 2) + 
+                 pow(w1_v+1 - ideal_valence(w1), 2) + pow(w2_v+1 - ideal_valence(w2), 2);
+        
+        if(d_ < d) {
+            mesh.flip(e);
+        }
+    }
 }
 
 void Remesher::smooth_vertices(){
@@ -100,7 +119,7 @@ void Remesher::smooth_vertices(){
 
 void Remesher::single_iteration(){
     split_long_edges();
-    //collapse_short_edges();
+    collapse_short_edges();
     flip_edges();
     smooth_vertices();
 }
@@ -114,4 +133,5 @@ void Remesher::remesh(){
         //TODO - run until converged
     }
 }
+
 } //namespace ba

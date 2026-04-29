@@ -57,6 +57,9 @@ private:
 
     /**
      * \brief Flips edges to improve valence of vertices.
+     * 
+     * Currently penalizes large deviations heavier with a squared error.
+     * Could also use abs instead
      */
     void flip_edges();
 
