@@ -26,8 +26,8 @@ double Remesher::avg_edge_length() {
 double Remesher::get_edge_loss(pmp::Edge e) {
     // Currently using basic log10 of ratio between length and target length
     
-    double length = edge_length(e);
-    return std::pow(std::log10(length / target_length), 2);
+    double loss = std::log2(edge_length(e) / target_length);
+    return loss * loss;
 }
 
 int Remesher::ideal_valence(pmp::Vertex v) {
@@ -154,11 +154,15 @@ void Remesher::flip_edges(){
 
         // Use squared loss to heavily penalize bad vertices.
         // Alternatively use abs instead
-        int d = pow(v1_v - ideal_valence(v1), 2) + pow(v2_v - ideal_valence(v2), 2) + 
-                pow(w1_v - ideal_valence(w1), 2) + pow(w2_v - ideal_valence(w2), 2);
+        int d = (v1_v - ideal_valence(v1)) * (v1_v - ideal_valence(v1)) + 
+                (v2_v - ideal_valence(v2)) * (v2_v - ideal_valence(v2)) + 
+                (w1_v - ideal_valence(w1)) * (w1_v - ideal_valence(w1)) + 
+                (w2_v - ideal_valence(w2)) * (w2_v - ideal_valence(w2));
 
-        int d_ = pow(v1_v-1 - ideal_valence(v1), 2) + pow(v2_v-1 - ideal_valence(v2), 2) + 
-                 pow(w1_v+1 - ideal_valence(w1), 2) + pow(w2_v+1 - ideal_valence(w2), 2);
+        int d_ = (v1_v - 1 - ideal_valence(v1)) * (v1_v - 1 - ideal_valence(v1)) + 
+                 (v2_v - 1 - ideal_valence(v2)) * (v2_v - 1 - ideal_valence(v2)) + 
+                 (w1_v + 1 - ideal_valence(w1)) * (w1_v + 1 - ideal_valence(w1)) + 
+                 (w2_v + 1 - ideal_valence(w2)) * (w2_v + 1 - ideal_valence(w2));
         
         if(d_ < d) {
             mesh.flip(e);
