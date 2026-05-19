@@ -1,2 +1,4 @@
 /build/
 /.vscode/
+.polyscope.ini
+imgui.ini
