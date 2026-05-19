@@ -1,4 +1,5 @@
 #include "ui/app_viewer.h"
+#include <algorithm>
 
 namespace ba::ui {
 
@@ -144,18 +145,28 @@ void AppViewer::draw_ui() {
     ImGui::SameLine();
     
     if (ImGui::Button("Remesh") && remesher) {
+        if(export_vtk) io::remove_vtks("../../out/vtk");
         is_remeshing = true;
         current_progress_iter = 0;
-        total_progress_iters = (remesher->get_run_until_converged() ? 100 : remesher->get_iterations() + 1);
+        total_progress_iters = (run_until_converged ? 100 : remesher->get_iterations());
         
         remesher->set_progress_callback([this](int cur, int total, double loss) {
             current_progress_iter = cur;
             total_progress_iters = total;
             current_progress_loss = loss;
+            if (export_vtk) {
+                std::vector<double> vertex_losses = get_vertex_losses();
+                if(!vertex_losses.empty()) {
+                    std::ostringstream s;
+                    s << "../../out/vtk/exported_mesh_" << std::setfill('0') << std::setw(4) 
+                      << current_progress_iter << ".vtk";
+                    io::export_mesh_vtk(s.str(), mesh, vertex_losses);
+                }
+            }
         });
         
         std::thread([this]() {
-            remesher->remesh();
+            remesher->remesh(log_csv, run_until_converged);
             is_remeshing = false;
             remesh_finished = true;
         }).detach();
@@ -163,28 +174,22 @@ void AppViewer::draw_ui() {
         ImGui::OpenPopup("Remeshing Progress");
     }
     
+    ImGui::BeginDisabled(run_until_converged);
     ImGui::SameLine();
-    ImGui::Text("Iter.:");
-    ImGui::SameLine();
-    ImGui::SetNextItemWidth(90.0);
+    ImGui::SetNextItemWidth(25.0);
     if (remesher) {
         int iterations_input = remesher->get_iterations();
-        if (ImGui::InputInt("##", &iterations_input)) {
+        if (ImGui::InputInt("Iters", &iterations_input, 0)) {
             remesher->set_iterations(iterations_input);
         }
     }
+    ImGui::EndDisabled();
     ImGui::SameLine();
-    bool run_until_converged_input = remesher->get_run_until_converged();
-    ImGui::Checkbox("Converge", &run_until_converged_input);
-    if(run_until_converged_input != remesher->get_run_until_converged()) {
-        remesher->set_run_until_converged(run_until_converged_input);
-    }
+    ImGui::Checkbox("Converge", &run_until_converged);
     ImGui::SameLine();
-    bool log_metrics_input = remesher->get_log_metrics();
-    ImGui::Checkbox("Log", &log_metrics_input);
-    if (log_metrics_input != remesher->get_log_metrics()) {
-        remesher->set_log_metrics(log_metrics_input);
-    }
+    ImGui::Checkbox("CSV", &log_csv);
+    ImGui::SameLine();
+    ImGui::Checkbox("VTK", &export_vtk);
 
     ImGui::Separator();
     ImGui::Text("Visualisation:");
@@ -193,9 +198,18 @@ void AppViewer::draw_ui() {
         add_vertex_loss();
         has_vertex_loss = true;
     } else if (!show_vertex_loss && has_vertex_loss) {
+        mesh_ps->getQuantity("Edge Loss")->setEnabled(false);
         mesh_ps->removeQuantity("Edge Loss");
         has_vertex_loss = false;
     }
+    ImGui::SameLine();
+    if (ImGui::Button("Export Mesh to .vtk")) {
+        std::vector<double> vertex_losses = get_vertex_losses();
+        if(!vertex_losses.empty()) {
+            io::export_mesh_vtk("../../out/vtk/exported_mesh.vtk", mesh, vertex_losses);
+        }
+    }
+
     ImGui::EndDisabled();
     
     if (ImGui::BeginPopupModal("Remeshing Progress", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
@@ -219,18 +233,36 @@ void AppViewer::draw_ui() {
     }
 }
 
-void AppViewer::add_vertex_loss() {
-    if (remesher && mesh_ps) {
-        std::vector<double> vertex_losses(mesh.n_vertices(), 0.0);
-
-        for(auto v : mesh.vertices()) {            
+std::vector<double> AppViewer::get_vertex_losses() {
+    std::vector<double> vertex_losses;
+    if(remesher) {
+        vertex_losses.resize(mesh.vertices_size(), 0.0);
+        for(auto v : mesh.vertices()) {
             for(auto h : mesh.halfedges(v)) {
                 pmp::Edge e = mesh.edge(h);
                 vertex_losses[v.idx()] += remesher->get_edge_loss(e);
             }
-            vertex_losses[v.idx()] /= mesh.valence(v);
+            if (mesh.valence(v) > 0) {
+                vertex_losses[v.idx()] /= mesh.valence(v);
+            }
         }
-        mesh_ps->addVertexScalarQuantity("Edge Loss", vertex_losses)->setColorMap("coolwarm");
+    } 
+    return vertex_losses;
+}
+
+void AppViewer::add_vertex_loss() {
+    if (remesher && mesh_ps) {
+        std::vector<double> vertex_losses = get_vertex_losses(), sorted_losses = vertex_losses;
+        size_t idx = std::min(sorted_losses.size() - 1, (size_t)(sorted_losses.size() * 0.90));
+        std::nth_element(sorted_losses.begin(), sorted_losses.begin() + idx, sorted_losses.end());
+        
+        double min_val = *std::min_element(vertex_losses.begin(), vertex_losses.end());
+        double max_val = sorted_losses[idx];
+
+        mesh_ps->addVertexScalarQuantity("Edge Loss", vertex_losses)
+               ->setColorMap("coolwarm")
+               ->setMapRange({min_val, max_val}) 
+               ->setEnabled(true);
     }
 }
 

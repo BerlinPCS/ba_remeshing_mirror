@@ -19,8 +19,6 @@ private:
     const double l_min = 0.8;
     double edge_loss = 0;
     int iterations = 5;
-    bool run_until_converged = false; // Internally max 100 iterations
-    bool log_metrics = false;
     
     // Callback for progress updates in ui thread
     std::function<void(int, int, double)> progress_callback = nullptr;
@@ -71,10 +69,6 @@ public:
      */
     double get_total_edge_loss() const { return edge_loss; }
 
-    bool get_log_metrics() const { return log_metrics; }
-    void set_log_metrics(bool l) { log_metrics = l; }
-    bool get_run_until_converged() const { return run_until_converged; }
-    void set_run_until_converged(bool r) { run_until_converged = r; }
     int get_iterations() const { return iterations; }
     void set_iterations(int i) { iterations = i; }
     double get_target_length() { return target_length; }
@@ -105,7 +99,7 @@ public:
      * the single_iteration() function will be called that many times. Otherwise 
      * it will continue untill the loss function has converged.
      */
-    void remesh();
+    void remesh(bool log_metrics = false, bool run_until_converged = false);
     
     Remesher(Mesh& m) : mesh(m), original_mesh(m) { target_length = avg_edge_length(m); }
 };

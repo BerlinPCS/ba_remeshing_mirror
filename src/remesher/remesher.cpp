@@ -194,11 +194,11 @@ void Remesher::single_iteration(){
     single_iteration(dummy_metrics);
 }
 
-void Remesher::remesh(){
+void Remesher::remesh(bool log_metrics, bool run_until_converged){
     IterationMetrics metrics;
     int max_iters = (run_until_converged ? 100 : iterations + 1);
     if(log_metrics) {
-        Logger logger("../../logs/standard_run_log.csv");
+        io::Logger logger("../../out/logs/standard_run_log.csv");
         for(int i = 0; i < max_iters; i++) {
             metrics.iteration_num = i;
             if(i > 0) {

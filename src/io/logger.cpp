@@ -1,6 +1,6 @@
 #include "io/logger.h"
 
-namespace ba {
+namespace ba::io {
 
 Logger::Logger(const std::string& filepath) : file_path(filepath) {
     std::filesystem::path path(filepath);

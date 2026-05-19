@@ -95,6 +95,7 @@ add_executable(
     src/ui/app_viewer.cpp
     src/remesher/remesher.cpp
     src/io/logger.cpp
+    src/io/paraview.cpp
 )
 
 target_include_directories(remesher PRIVATE "${polyscope_SOURCE_DIR}/deps/args")

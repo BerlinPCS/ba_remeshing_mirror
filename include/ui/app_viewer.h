@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <algorithm>
 #include <string>
 #include <vector>
 #include <unordered_set>
@@ -10,6 +11,7 @@
 
 #include "core/types.h"
 #include "remesher/remesher.h"
+#include "io/paraview.h"
 
 #include <pmp/io/io.h>
 #include "polyscope/polyscope.h"
@@ -28,6 +30,7 @@ namespace ba::ui {
         std::vector<std::string> mesh_names;
         int selected_mesh = 0;
         bool show_vertex_loss = false, has_vertex_loss = false;
+        bool log_csv = false, run_until_converged = false, export_vtk = false;
         
         std::atomic<bool> is_remeshing{false};
         std::atomic<bool> remesh_finished{false};
@@ -52,6 +55,8 @@ namespace ba::ui {
          * \returns A pointer to the registered Polyscope mesh for inline operations
          */
         ps::SurfaceMesh* update_polyscope();
+
+        std::vector<double> get_vertex_losses();
 
         /**
          * Adds a scalar quantity to the mesh representing the loss associated with each vertex.

@@ -7,7 +7,7 @@
 
 #include "core/types.h"
 
-namespace ba {
+namespace ba::io {
 
 class Logger {
 private:
