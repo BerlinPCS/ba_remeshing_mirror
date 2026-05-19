@@ -1,8 +1,9 @@
 /build/
 /.cache/
 /.vscode/
+.venv/
 /logs/
-/out/
+out/vtk/
 /tmp/
 .polyscope.ini
 imgui.ini
