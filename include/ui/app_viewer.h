@@ -4,11 +4,16 @@
 #include <string>
 #include <vector>
 #include <unordered_set>
+#include <atomic>
+#include <filesystem>
+#include <thread>
 
 #include "core/types.h"
 #include "remesher/remesher.h"
 
+#include <pmp/io/io.h>
 #include "polyscope/polyscope.h"
+#include "portable-file-dialogs.h"
 
 namespace ba::ui {
 
@@ -23,6 +28,12 @@ namespace ba::ui {
         std::vector<std::string> mesh_names;
         int selected_mesh = 0;
         bool show_vertex_loss = false, has_vertex_loss = false;
+        
+        std::atomic<bool> is_remeshing{false};
+        std::atomic<bool> remesh_finished{false};
+        std::atomic<int> current_progress_iter{0};
+        std::atomic<int> total_progress_iters{100};
+        std::atomic<double> current_progress_loss{0.0};
 
         /**
          * \brief Loads a mesh based on a .obj, .stl, or .off file. 

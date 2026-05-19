@@ -1,6 +1,4 @@
 #include "remesher/remesher.h"
-#include "core/geo_utils.h"
-#include <pmp/surface_mesh.h>
 
 namespace ba {
 
@@ -12,7 +10,16 @@ double Remesher::get_edge_loss(Edge e) {
     return loss * loss;
 }
 
-void Remesher::split_long_edges(){
+double Remesher::calc_total_edge_loss() {
+    double loss = 0;
+    for(auto e : mesh.edges()) {
+        loss += get_edge_loss(e);
+    }
+    edge_loss = loss;
+    return loss;
+}
+
+int Remesher::split_long_edges(){
     // Gather Relevant Edges to Split later
     std::vector<Edge> edges_to_split;
     edges_to_split.reserve(mesh.n_edges() / 4); // basic heuristic
@@ -21,8 +28,6 @@ void Remesher::split_long_edges(){
             edges_to_split.push_back(e);
         }
     }
-
-    std::cout << "Splitting " << edges_to_split.size() << " long edges." << std::endl;
 
     // Split gathered edges
     for(auto e : edges_to_split) {
@@ -37,9 +42,11 @@ void Remesher::split_long_edges(){
 
         mesh.split(e, v_mid);
     }
+    return edges_to_split.size();
 }
 
-void Remesher::collapse_short_edges(){
+int Remesher::collapse_short_edges(){
+    int count = 0;
     // Gather Relevant Edges to Collapse later
     std::vector<Edge> edges_to_collapse;
     edges_to_collapse.reserve(mesh.n_edges() / 4);
@@ -48,8 +55,6 @@ void Remesher::collapse_short_edges(){
             edges_to_collapse.push_back(e);
         }
     }
-
-    std::cout << "Collapsing " << edges_to_collapse.size() << " short edges." << std::endl;
 
     // Collapse gathered edges
     for(auto e : edges_to_collapse) {
@@ -87,14 +92,16 @@ void Remesher::collapse_short_edges(){
             }
 
             if (creates_long_edge) continue;
-
+            count++;
             mesh.position(v_to) = new_pos;
             mesh.collapse(h);
         }
     }
+    return count;
 }
 
-void Remesher::flip_edges(){
+int Remesher::flip_edges(){
+    int count = 0;
     // Gather Relevant Edges to Check later
     std::vector<Edge> edges_to_check;
     edges_to_check.reserve(mesh.n_edges() / 4);
@@ -103,8 +110,6 @@ void Remesher::flip_edges(){
             edges_to_check.push_back(e);
         }
     }
-
-    std::cout << "Checking " << edges_to_check.size() << " edges to flip." << std::endl;
 
     for(auto e : edges_to_check) {
         if (!mesh.is_flip_ok(e)) continue;
@@ -136,14 +141,17 @@ void Remesher::flip_edges(){
                  (w2_v + 1 - iw2) * (w2_v + 1 - iw2);
         
         if(d_ < d) {
+            count++;
             mesh.flip(e);
         }
     }
+    return count;
 }
 
 //Based off https://stanford-cs248.github.io/Cardinal3D/meshedit/global/remesh/
 //Didn't add the part where the vertexes get moved gently
-void Remesher::smooth_vertices(){
+int Remesher::smooth_vertices(){
+    int count = 0;
     auto v_new = mesh.add_vertex_property<vec3>("v:new", vec3(0,0,0));
 
     for(auto v : mesh.vertices()) {
@@ -167,28 +175,57 @@ void Remesher::smooth_vertices(){
     for(auto v : mesh.vertices()){
         if(!mesh.is_boundary(v)) {
             mesh.position(v) += v_new[v];
+            count++;
         }
     }
-
-    std::cout << "Smoothed vertices." << std::endl;
-
     mesh.remove_vertex_property(v_new);
+    return count;
+}
+
+void Remesher::single_iteration(IterationMetrics &metrics){
+    metrics.split_count = split_long_edges();
+    metrics.collapse_count = collapse_short_edges();
+    metrics.flip_count = flip_edges();
+    metrics.smooth_count = smooth_vertices();
 }
 
 void Remesher::single_iteration(){
-    split_long_edges();
-    collapse_short_edges();
-    flip_edges();
-    smooth_vertices();
+    IterationMetrics dummy_metrics;
+    single_iteration(dummy_metrics);
 }
 
 void Remesher::remesh(){
-    if(iterations > 0) {
-        for(int i = 0; i < iterations; i++) {
-            single_iteration();
+    IterationMetrics metrics;
+    int max_iters = (run_until_converged ? 100 : iterations + 1);
+    if(log_metrics) {
+        Logger logger("../../logs/standard_run_log.csv");
+        for(int i = 0; i < max_iters; i++) {
+            metrics.iteration_num = i;
+            if(i > 0) {
+                auto start = std::chrono::high_resolution_clock::now();
+                single_iteration(metrics);
+                auto end = std::chrono::high_resolution_clock::now();
+                std::chrono::duration<double> elapsed = end - start;
+                metrics.time_ms = elapsed.count() * 1000;
+            } else {
+                metrics.time_ms = -1;
+                metrics.split_count = -1;
+                metrics.collapse_count = -1;
+                metrics.flip_count = -1;
+                metrics.smooth_count = -1;
+            }
+            metrics.total_edge_loss = calc_total_edge_loss();
+            metrics.volume_ratio = volume_ratio(original_mesh, mesh);
+            metrics.vertex_count = mesh.n_vertices();
+            logger.log_iteration(metrics);
+            
+            if (progress_callback) progress_callback(i + 1, max_iters, get_total_edge_loss());
         }
     } else {
-        //TODO - run until converged
+        for(int i = 0; i < max_iters; i++) {
+            single_iteration(metrics);
+            if (progress_callback) progress_callback(i + 1, max_iters, calc_total_edge_loss());
+        }
     }
 }
 

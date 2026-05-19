@@ -94,6 +94,7 @@ add_executable(
     src/core/geo_utils.cpp
     src/ui/app_viewer.cpp
     src/remesher/remesher.cpp
+    src/io/logger.cpp
 )
 
 target_include_directories(remesher PRIVATE "${polyscope_SOURCE_DIR}/deps/args")

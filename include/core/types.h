@@ -21,4 +21,21 @@ using Scalar = pmp::Scalar;
 using vec3 = pmp::vec3;
 using vec2 = pmp::vec2;
 
+/**
+ * \brief A struct to hold metrics for a single iteration.
+ */
+struct IterationMetrics {
+    int iteration_num;
+    double time_ms;
+    double total_edge_loss;
+    double volume_ratio;
+    int vertex_count;
+    
+    // Operation counts
+    int split_count;
+    int collapse_count;
+    int flip_count;
+    int smooth_count;
+};
+
 } // namespace ba

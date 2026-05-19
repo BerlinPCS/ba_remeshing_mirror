@@ -1,6 +1,7 @@
 /build/
 /.cache/
 /.vscode/
+/logs/
 .polyscope.ini
 imgui.ini
 *.txt

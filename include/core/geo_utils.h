@@ -42,4 +42,18 @@ Normal vertex_normal(const Mesh& mesh, Vertex v);
  */
 int ideal_valence(const Mesh& mesh, Vertex v);
 
+/**
+ * \brief Gets the volume of a Mesh.
+ *
+ * \return The volume as a double.
+ */
+double get_mesh_volume(const Mesh& mesh);
+
+/**
+ * \brief Calculates the ratio of volumes between two meshes.
+ * mesh2 / mesh1
+ * \return The volume ratio as a double.
+ */
+double volume_ratio(const Mesh& mesh1, const Mesh& mesh2);
+
 } // namespace ba::core

@@ -1,18 +1,5 @@
 #include "ui/app_viewer.h"
 
-#include <memory>
-#include <string>
-#include <vector>
-#include <unordered_set>
-#include <filesystem>
-
-#include "core/types.h"
-#include "remesher/remesher.h"
-
-#include <pmp/io/io.h>
-#include "polyscope/polyscope.h"
-#include "portable-file-dialogs.h"
-
 namespace ba::ui {
 
 ps::SurfaceMesh* AppViewer::update_polyscope() {
@@ -38,6 +25,11 @@ ps::SurfaceMesh* AppViewer::update_polyscope() {
     }
 
     mesh_ps = polyscope::registerSurfaceMesh("mesh", vertices, faces);
+    
+    if (show_vertex_loss) {
+        add_vertex_loss();
+        has_vertex_loss = true;
+    }
     return mesh_ps;
 }
 
@@ -92,6 +84,7 @@ void AppViewer::init() {
 }
 
 void AppViewer::draw_ui() {
+    ImGui::BeginDisabled(is_remeshing);
     ImGui::Text("Meshes:");
     static std::vector<const char*> names;
     names.clear();
@@ -149,17 +142,48 @@ void AppViewer::draw_ui() {
         update_polyscope(); 
     }
     ImGui::SameLine();
-    if (ImGui::Button("Remesh")) {
-        remesher->remesh();
-        update_polyscope(); 
+    
+    if (ImGui::Button("Remesh") && remesher) {
+        is_remeshing = true;
+        current_progress_iter = 0;
+        total_progress_iters = (remesher->get_run_until_converged() ? 100 : remesher->get_iterations() + 1);
+        
+        remesher->set_progress_callback([this](int cur, int total, double loss) {
+            current_progress_iter = cur;
+            total_progress_iters = total;
+            current_progress_loss = loss;
+        });
+        
+        std::thread([this]() {
+            remesher->remesh();
+            is_remeshing = false;
+            remesh_finished = true;
+        }).detach();
+        
+        ImGui::OpenPopup("Remeshing Progress");
     }
+    
+    ImGui::SameLine();
+    ImGui::Text("Iter.:");
     ImGui::SameLine();
     ImGui::SetNextItemWidth(90.0);
     if (remesher) {
         int iterations_input = remesher->get_iterations();
-        if (ImGui::InputInt("Iterations", &iterations_input)) {
+        if (ImGui::InputInt("##", &iterations_input)) {
             remesher->set_iterations(iterations_input);
         }
+    }
+    ImGui::SameLine();
+    bool run_until_converged_input = remesher->get_run_until_converged();
+    ImGui::Checkbox("Converge", &run_until_converged_input);
+    if(run_until_converged_input != remesher->get_run_until_converged()) {
+        remesher->set_run_until_converged(run_until_converged_input);
+    }
+    ImGui::SameLine();
+    bool log_metrics_input = remesher->get_log_metrics();
+    ImGui::Checkbox("Log", &log_metrics_input);
+    if (log_metrics_input != remesher->get_log_metrics()) {
+        remesher->set_log_metrics(log_metrics_input);
     }
 
     ImGui::Separator();
@@ -171,6 +195,27 @@ void AppViewer::draw_ui() {
     } else if (!show_vertex_loss && has_vertex_loss) {
         mesh_ps->removeQuantity("Edge Loss");
         has_vertex_loss = false;
+    }
+    ImGui::EndDisabled();
+    
+    if (ImGui::BeginPopupModal("Remeshing Progress", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::Text("Remeshing in progress...");
+        int cur = current_progress_iter.load();
+        int total = total_progress_iters.load();
+        float progress = total > 0 ? (float)cur / (float)total : 0.0f;
+        ImGui::ProgressBar(progress, ImVec2(250.0f, 0.0f));
+        ImGui::Text("Iteration: %d / %d", cur, total);
+        ImGui::Text("Total Edge Loss: %.4f", current_progress_loss.load());
+        
+        if (!is_remeshing) {
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
+
+    if (remesh_finished) {
+        update_polyscope();
+        remesh_finished = false;
     }
 }
 

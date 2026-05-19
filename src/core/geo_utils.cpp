@@ -1,5 +1,4 @@
 #include "core/geo_utils.h"
-#include <iostream>
 
 namespace ba {
 
@@ -14,6 +13,7 @@ double edge_length(const Mesh& mesh, Edge e) {
 }
 
 double avg_edge_length(const Mesh& mesh) {
+    if (mesh.n_edges() == 0) return 0.0;
     double avg_length = 0.0;
     for(auto e : mesh.edges()) {
         avg_length += edge_length(mesh, e);
@@ -25,10 +25,8 @@ double avg_edge_length(const Mesh& mesh) {
 Normal face_normal(const Mesh& mesh, Face f) {
     auto v_it = mesh.vertices(f);
     auto it = v_it.begin();
-    Point p0 = mesh.position(*it);
-    ++it;
-    Point p1 = mesh.position(*it);
-    ++it;
+    Point p0 = mesh.position(*it); ++it;
+    Point p1 = mesh.position(*it); ++it;
     Point p2 = mesh.position(*it);
     
     return pmp::cross(p1 - p0, p2 - p0);
@@ -47,6 +45,26 @@ int ideal_valence(const Mesh& mesh, Vertex v) {
         return 4;
     }
     return 6;
+}
+
+double get_mesh_volume(const Mesh& mesh) {
+    double volume = 0.0;
+    for (auto f : mesh.faces()) {
+        auto v_it = mesh.vertices(f);
+        auto it = v_it.begin();
+        Point p0 = mesh.position(*it); ++it;
+        Point p1 = mesh.position(*it); ++it;
+        Point p2 = mesh.position(*it);
+        
+        volume += pmp::dot(p0, pmp::cross(p1, p2));
+    }
+    return std::abs(volume) / 6.0;
+}
+
+double volume_ratio(const Mesh& mesh1, const Mesh& mesh2) {
+    double vol1 = get_mesh_volume(mesh1), vol2 = get_mesh_volume(mesh2);
+    if (vol1 == 0.0 || vol2 == 0.0) return -1.0; 
+    return vol2 / vol1;
 }
 
 } // namespace ba
