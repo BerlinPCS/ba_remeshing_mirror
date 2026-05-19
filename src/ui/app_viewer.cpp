@@ -20,18 +20,21 @@ ps::SurfaceMesh* AppViewer::update_polyscope() {
 
     //Convert to Polyscope format
     std::vector<glm::vec3> vertices;
+    vertices.reserve(mesh.n_vertices());
     for(auto v : mesh.vertices()) {
         auto p = mesh.position(v);
         vertices.push_back(glm::vec3(p[0], p[1], p[2]));
     }
 
     std::vector<std::vector<size_t>> faces;
+    faces.reserve(mesh.n_faces());
     for(auto f : mesh.faces()) {
         std::vector<size_t> face_indices;
+        face_indices.reserve(mesh.valence(f));
         for(auto v : mesh.vertices(f)) {
             face_indices.push_back(v.idx());
         }
-        faces.push_back(face_indices);
+        faces.push_back(std::move(face_indices));
     }
 
     mesh_ps = polyscope::registerSurfaceMesh("mesh", vertices, faces);
@@ -42,7 +45,9 @@ void AppViewer::load_mesh(const std::string& filepath) {
     mesh.clear();
     pmp::read(mesh, filepath);
     remesher = std::make_unique<ba::Remesher>(mesh);
+    has_vertex_loss = false; 
     update_polyscope()->setEdgeWidth(1.0);
+    polyscope::view::resetCameraToHomeView();
 }
 
 std::string format_file_name(const std::string& name) {
@@ -107,6 +112,10 @@ void AppViewer::draw_ui() {
             }, pfd::opt::none
         ).result();
         if (!paths.empty()) load_mesh(paths[0]);
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Reset Mesh")) {
+        load_mesh(file_paths[selected_mesh]);
     }
 
 

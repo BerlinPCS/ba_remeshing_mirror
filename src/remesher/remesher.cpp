@@ -1,63 +1,23 @@
 #include "remesher/remesher.h"
+#include "core/geo_utils.h"
 #include <pmp/surface_mesh.h>
 
 namespace ba {
 
-double Remesher::edge_length(Edge e) {
-    Vertex v0 = mesh.vertex(e, 0);
-    Vertex v1 = mesh.vertex(e, 1);
-
-    Point p0 = mesh.position(v0);
-    Point p1 = mesh.position(v1);
-
-    return pmp::distance(p0, p1);
-}
-
-double Remesher::avg_edge_length() {
-    double avg_length = 0.0;
-    for(auto e : mesh.edges()) {
-        avg_length += edge_length(e);
-    }
-    avg_length /= mesh.n_edges();
-    std::cout << "Average Edge Length: " << avg_length << std::endl;
-    return avg_length;
-}
-
 double Remesher::get_edge_loss(Edge e) {
     // Currently using basic log10 of ratio between length and target length
     
-    double loss = std::log2(edge_length(e) / target_length);
+    double ratio = edge_length(mesh, e) / target_length;
+    double loss = std::log2(std::max(0.001, std::min(1000.0, ratio)));
     return loss * loss;
-}
-
-int Remesher::ideal_valence(Vertex v) {
-    if (mesh.is_boundary(v)) {
-        return 4;
-    }
-    return 6;
-}
-
-Normal Remesher::face_normal(Face f) {
-    std::vector<Point> points;
-    for(auto v : mesh.vertices(f)) {
-        points.push_back(mesh.position(v));
-    }
-    return pmp::cross(points[1] - points[0], points[2] - points[0]);
-}
-
-Normal Remesher::vertex_normal(Vertex v) {
-    Normal normal(0, 0, 0);
-    for(auto f : mesh.faces(v)) {
-        normal += face_normal(f);
-    }
-    return pmp::normalize(normal);
 }
 
 void Remesher::split_long_edges(){
     // Gather Relevant Edges to Split later
     std::vector<Edge> edges_to_split;
+    edges_to_split.reserve(mesh.n_edges() / 4); // basic heuristic
     for(auto e : mesh.edges()) {
-        if (edge_length(e) > target_length * l_max) {
+        if (edge_length(mesh, e) > target_length * l_max) {
             edges_to_split.push_back(e);
         }
     }
@@ -82,9 +42,9 @@ void Remesher::split_long_edges(){
 void Remesher::collapse_short_edges(){
     // Gather Relevant Edges to Collapse later
     std::vector<Edge> edges_to_collapse;
+    edges_to_collapse.reserve(mesh.n_edges() / 4);
     for(auto e : mesh.edges()) {
-        //Skip boundary edges for now
-        if (!mesh.is_boundary(e) && edge_length(e) < target_length * l_min) {
+        if (edge_length(mesh, e) < target_length * l_min) {
             edges_to_collapse.push_back(e);
         }
     }
@@ -95,26 +55,31 @@ void Remesher::collapse_short_edges(){
     for(auto e : edges_to_collapse) {
         if (mesh.is_deleted(e)) continue;
         Halfedge h = mesh.halfedge(e, 0);
-        Vertex v_from = mesh.from_vertex(h);
-        Vertex v_to = mesh.to_vertex(h);
 
-        if(mesh.is_boundary(v_from) || mesh.is_boundary(v_to)) continue;
-        
+        // If one of the vertices is on the boundary, we collapse into the boundary vertex.
+        // Otherwise, we pull the boundary inwards, changing the shape drastically.
+        // Choose proper Halfedge to collapse into the boundary vertex
+        if (mesh.is_boundary(mesh.from_vertex(h)) && !mesh.is_boundary(mesh.to_vertex(h))) h = mesh.halfedge(e, 1);
         if (mesh.is_collapse_ok(h)) {
-            Point p_mid = 0.5 * (mesh.position(v_from) + mesh.position(v_to));
+            Vertex v_from = mesh.from_vertex(h);
+            Vertex v_to = mesh.to_vertex(h);
+            Point pos_to = mesh.position(v_to);
+            Point new_pos = (mesh.is_boundary(v_to)) ? pos_to : 0.5 * (mesh.position(v_from) + pos_to);
 
             // Check if the collapse would create a long edge, which would result in a loop
             bool creates_long_edge = false;
             for(auto v_n : mesh.vertices(v_from)) {
-                if (pmp::distance(p_mid, mesh.position(v_n)) > target_length * l_max) {
+                if (v_n == v_to) continue;
+                if (pmp::distance(new_pos, mesh.position(v_n)) > target_length * l_max) {
                     creates_long_edge = true;
                     break;
                 }
             }
 
             if(!creates_long_edge) {
-                for(auto v_n : mesh.vertices(v_from)) {
-                    if (pmp::distance(p_mid, mesh.position(v_n)) > target_length * l_max) {
+                for(auto v_n : mesh.vertices(v_to)) {
+                    if (v_n == v_from) continue;
+                    if (pmp::distance(new_pos, mesh.position(v_n)) > target_length * l_max) {
                         creates_long_edge = true;
                         break;
                     }
@@ -123,7 +88,7 @@ void Remesher::collapse_short_edges(){
 
             if (creates_long_edge) continue;
 
-            mesh.position(v_to) = p_mid;
+            mesh.position(v_to) = new_pos;
             mesh.collapse(h);
         }
     }
@@ -132,6 +97,7 @@ void Remesher::collapse_short_edges(){
 void Remesher::flip_edges(){
     // Gather Relevant Edges to Check later
     std::vector<Edge> edges_to_check;
+    edges_to_check.reserve(mesh.n_edges() / 4);
     for(auto e : mesh.edges()) {
         if (mesh.is_flip_ok(e)) {
             edges_to_check.push_back(e);
@@ -152,17 +118,22 @@ void Remesher::flip_edges(){
         int w1_v = mesh.valence(w1);
         int w2_v = mesh.valence(w2);
 
+        int iv1 = ideal_valence(mesh, v1);
+        int iv2 = ideal_valence(mesh, v2);
+        int iw1 = ideal_valence(mesh, w1);
+        int iw2 = ideal_valence(mesh, w2);
+
         // Use squared loss to heavily penalize bad vertices.
         // Alternatively use abs instead
-        int d = (v1_v - ideal_valence(v1)) * (v1_v - ideal_valence(v1)) + 
-                (v2_v - ideal_valence(v2)) * (v2_v - ideal_valence(v2)) + 
-                (w1_v - ideal_valence(w1)) * (w1_v - ideal_valence(w1)) + 
-                (w2_v - ideal_valence(w2)) * (w2_v - ideal_valence(w2));
+        int d = (v1_v - iv1) * (v1_v - iv1) + 
+                (v2_v - iv2) * (v2_v - iv2) + 
+                (w1_v - iw1) * (w1_v - iw1) + 
+                (w2_v - iw2) * (w2_v - iw2);
 
-        int d_ = (v1_v - 1 - ideal_valence(v1)) * (v1_v - 1 - ideal_valence(v1)) + 
-                 (v2_v - 1 - ideal_valence(v2)) * (v2_v - 1 - ideal_valence(v2)) + 
-                 (w1_v + 1 - ideal_valence(w1)) * (w1_v + 1 - ideal_valence(w1)) + 
-                 (w2_v + 1 - ideal_valence(w2)) * (w2_v + 1 - ideal_valence(w2));
+        int d_ = (v1_v - 1 - iv1) * (v1_v - 1 - iv1) + 
+                 (v2_v - 1 - iv2) * (v2_v - 1 - iv2) + 
+                 (w1_v + 1 - iw1) * (w1_v + 1 - iw1) + 
+                 (w2_v + 1 - iw2) * (w2_v + 1 - iw2);
         
         if(d_ < d) {
             mesh.flip(e);
@@ -181,14 +152,14 @@ void Remesher::smooth_vertices(){
 
         // Get center of neighbours
         Point center(0, 0, 0);
-        for(auto v : mesh.vertices(v)){
-            center += mesh.position(v);
+        for(auto vn : mesh.vertices(v)){
+            center += mesh.position(vn);
         }
         center /= mesh.valence(v);
 
         // Calculate the new position
         vec3 dir = center - mesh.position(v);
-        Normal normal = vertex_normal(v);
+        Normal normal = vertex_normal(mesh, v);
         v_new[v] = dir - pmp::dot(dir, normal) * normal;
     }
 

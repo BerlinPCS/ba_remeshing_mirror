@@ -1,6 +1,8 @@
 #pragma once
 #include <pmp/surface_mesh.h>
+#include <iostream>
 #include "core/types.h"
+#include "core/geo_utils.h"
 
 namespace ba
 {
@@ -13,43 +15,6 @@ private:
     const double l_min = 0.8;
     double loss;
     int iterations = 5;
-
-    /**
-     * \brief Gets the length of a single edge 
-     *
-     * \return The length value as a double.
-     */
-    double edge_length(Edge e);
-
-    /**
-     * \brief Calculates the average edge length in the mesh
-     *
-     * \return The average length value as a double.
-     */
-    double avg_edge_length();
-
-    /**
-     * \brief Gets the ideal valence of a Vertex v. 
-     * 
-     * This is 6 for interior vertices and 4 for boundary vertices.
-     *
-     * \return The ideal valence as an integer.
-     */
-    int ideal_valence(Vertex v);
-
-    /**
-     * \brief Gets the area of a Face f. 
-     *
-     * \return The area as a double.
-     */
-    Normal face_normal(Face f);
-
-    /**
-     * \brief Gets the normal of a Vertex v based on the surrounding face normals (weighted). 
-     *
-     * \return The normal as a Normal.
-     */
-    Normal vertex_normal(Vertex v);
 
     public:
 
@@ -104,7 +69,6 @@ private:
     void set_iterations(double i) { iterations = i; }
 
     double get_target_length() { return target_length; }
-
     void set_target_length(double t) { target_length = t; }
 
     /**
@@ -127,7 +91,7 @@ private:
      */
     void remesh();
     
-    Remesher(Mesh& m) : mesh(m) { target_length = avg_edge_length(); }
+    Remesher(Mesh& m) : mesh(m) { target_length = avg_edge_length(m); }
 };
 
 } //namespace ba
