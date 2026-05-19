@@ -80,12 +80,23 @@ CPMAddPackage(
     GIT_TAG v2.6.1
 )
 
+CPMAddPackage(
+  NAME portable_file_dialogs
+  GITHUB_REPOSITORY samhocevar/portable-file-dialogs
+  GIT_TAG 0.1.0
+)
+ 
 include_directories(include)
 
 add_executable(
     remesher 
     src/main.cpp
-    src/remesher.cpp
+    src/core/geo_utils.cpp
+    src/ui/app_viewer.cpp
+    src/remesher/remesher.cpp
 )
 
-target_link_libraries(remesher PRIVATE pmp polyscope)
+target_include_directories(remesher PRIVATE "${polyscope_SOURCE_DIR}/deps/args")
+target_include_directories(remesher PRIVATE "${polyscope_SOURCE_DIR}/deps/json/include")
+
+target_link_libraries(remesher PRIVATE pmp polyscope portable_file_dialogs)

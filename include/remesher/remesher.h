@@ -1,24 +1,25 @@
 #pragma once
 #include <pmp/surface_mesh.h>
+#include "core/types.h"
 
-namespace ba 
+namespace ba
 {
 
 class Remesher {
 private: 
-    pmp::SurfaceMesh& mesh;
+    Mesh& mesh;
     double target_length;
     const double l_max = 1.3333;
     const double l_min = 0.8;
     double loss;
-    int iterations;
+    int iterations = 5;
 
     /**
      * \brief Gets the length of a single edge 
      *
      * \return The length value as a double.
      */
-    double edge_length(pmp::Edge e);
+    double edge_length(Edge e);
 
     /**
      * \brief Calculates the average edge length in the mesh
@@ -34,21 +35,21 @@ private:
      *
      * \return The ideal valence as an integer.
      */
-    int ideal_valence(pmp::Vertex v);
+    int ideal_valence(Vertex v);
 
     /**
      * \brief Gets the area of a Face f. 
      *
      * \return The area as a double.
      */
-    pmp::Normal face_normal(pmp::Face f);
+    Normal face_normal(Face f);
 
     /**
      * \brief Gets the normal of a Vertex v based on the surrounding face normals (weighted). 
      *
-     * \return The normal as a pmp::Normal.
+     * \return The normal as a Normal.
      */
-    pmp::Normal vertex_normal(pmp::Vertex v);
+    Normal vertex_normal(Vertex v);
 
     public:
 
@@ -57,7 +58,7 @@ private:
      *
      * \return The loss value as a double.
      */
-    double get_edge_loss(pmp::Edge e);
+    double get_edge_loss(Edge e);
 
     /**
      * \brief Splits long edges that exceed 4/3rds of the target length.
@@ -102,6 +103,10 @@ private:
      */
     void set_iterations(double i) { iterations = i; }
 
+    double get_target_length() { return target_length; }
+
+    void set_target_length(double t) { target_length = t; }
+
     /**
      * \brief Performs a single iteration of the isotropic remeshing algorithm
      * 
@@ -121,15 +126,8 @@ private:
      * it will continue untill the loss function has converged.
      */
     void remesh();
-
-    Remesher(pmp::SurfaceMesh& m, double t, int i) : mesh(m), target_length(t), iterations(i) {}
-    Remesher(pmp::SurfaceMesh& m, double t) : mesh(m), target_length(t), iterations(0) {}
-    Remesher(pmp::SurfaceMesh& m, int i) : mesh(m), iterations(i) {
-        target_length = avg_edge_length();
-    }
-    Remesher(pmp::SurfaceMesh& m) : mesh(m), iterations(0) {
-        target_length = avg_edge_length();
-    }
+    
+    Remesher(Mesh& m) : mesh(m) { target_length = avg_edge_length(); }
 };
 
 } //namespace ba

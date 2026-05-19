@@ -1,0 +1,183 @@
+#include "ui/app_viewer.h"
+
+#include <memory>
+#include <string>
+#include <vector>
+#include <unordered_set>
+#include <filesystem>
+
+#include "core/types.h"
+#include "remesher/remesher.h"
+
+#include <pmp/io/io.h>
+#include "polyscope/polyscope.h"
+#include "portable-file-dialogs.h"
+
+namespace ba::ui {
+
+ps::SurfaceMesh* AppViewer::update_polyscope() {
+    mesh.garbage_collection();
+
+    //Convert to Polyscope format
+    std::vector<glm::vec3> vertices;
+    for(auto v : mesh.vertices()) {
+        auto p = mesh.position(v);
+        vertices.push_back(glm::vec3(p[0], p[1], p[2]));
+    }
+
+    std::vector<std::vector<size_t>> faces;
+    for(auto f : mesh.faces()) {
+        std::vector<size_t> face_indices;
+        for(auto v : mesh.vertices(f)) {
+            face_indices.push_back(v.idx());
+        }
+        faces.push_back(face_indices);
+    }
+
+    mesh_ps = polyscope::registerSurfaceMesh("mesh", vertices, faces);
+    return mesh_ps;
+}
+
+void AppViewer::load_mesh(const std::string& filepath) {
+    mesh.clear();
+    pmp::read(mesh, filepath);
+    remesher = std::make_unique<ba::Remesher>(mesh);
+    update_polyscope()->setEdgeWidth(1.0);
+}
+
+std::string format_file_name(const std::string& name) {
+    std::string result;
+    bool capitalizeNext = true;
+    for (char ch : name) {
+        if (ch == '_' || ch == '-') {
+            result += ' ';
+            capitalizeNext = true;
+        } else {
+            if (capitalizeNext) {
+                result += std::toupper(ch);
+                capitalizeNext = false;
+            } else {
+                result += ch;
+            }
+        }
+    }
+    return result;
+}
+
+void AppViewer::init() {
+    file_paths.clear();
+    mesh_names.clear();
+    for (auto& file : std::filesystem::recursive_directory_iterator(path_to_data)) {
+        if (file.is_regular_file()) {
+            auto ext = file.path().extension().string();
+            if (ext == ".off" || ext == ".obj" || ext == ".stl") {
+                file_paths.push_back(file.path().string());
+                mesh_names.push_back(format_file_name(file.path().stem().string()));
+            }
+        }
+    }
+
+    polyscope::options::groundPlaneMode = polyscope::GroundPlaneMode::ShadowOnly;
+    polyscope::options::shadowBlurIters = 6;
+    polyscope::init();
+    if (!file_paths.empty()) {
+        load_mesh(file_paths[0]);
+    }
+    polyscope::state::userCallback = [this]() { this->draw_ui(); };
+}
+
+void AppViewer::draw_ui() {
+    ImGui::Text("Meshes:");
+    static std::vector<const char*> names;
+    names.clear();
+    for (const auto& name : mesh_names) names.push_back(name.c_str());
+    ImGui::SetNextItemWidth(180.0f);
+    if (ImGui::Combo("##mesh_selector", &selected_mesh, names.data(), (int)names.size())) {
+        load_mesh(file_paths[selected_mesh]);
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Load from File")) {
+        auto paths = pfd::open_file(
+            "Load Mesh", "", std::vector<std::string>{
+                "Mesh files (*.off *.obj *.stl)", "*.off;*.obj;*.stl",
+                "OFF files (*.off)", "*.off",
+                "OBJ files (*.obj)", "*.obj",
+                "STL files (*.stl)", "*.stl",
+                "All files (*.*)", "*.*"
+            }, pfd::opt::none
+        ).result();
+        if (!paths.empty()) load_mesh(paths[0]);
+    }
+
+
+    ImGui::Separator(); 
+    ImGui::Text("Single Operations:");
+    if (ImGui::Button("Split Long Edges")) {
+        remesher->split_long_edges();
+        update_polyscope(); 
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Collapse Short Edges")) {
+        remesher->collapse_short_edges();
+        update_polyscope(); 
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Flip Edges")) {
+        remesher->flip_edges();
+        update_polyscope(); 
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Smooth Vertices")) {
+        remesher->smooth_vertices();
+        update_polyscope(); 
+    }
+
+
+    ImGui::Separator();
+    ImGui::Text("Remeshing:");
+    if (ImGui::Button("Run 1 Iteration")) {
+        remesher->single_iteration();
+        update_polyscope(); 
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Remesh")) {
+        remesher->remesh();
+        update_polyscope(); 
+    }
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(90.0);
+    if (remesher) {
+        int iterations_input = remesher->get_iterations();
+        if (ImGui::InputInt("Iterations", &iterations_input)) {
+            remesher->set_iterations(iterations_input);
+        }
+    }
+
+    ImGui::Separator();
+    ImGui::Text("Visualisation:");
+    ImGui::Checkbox("Show Vertex Loss", &show_vertex_loss);
+    if (show_vertex_loss && !has_vertex_loss) {
+        add_vertex_loss();
+        has_vertex_loss = true;
+    } else if (!show_vertex_loss && has_vertex_loss) {
+        mesh_ps->removeQuantity("Edge Loss");
+        has_vertex_loss = false;
+    }
+}
+
+void AppViewer::add_vertex_loss() {
+    if (remesher && mesh_ps) {
+        std::vector<double> vertex_losses(mesh.n_vertices(), 0.0);
+
+        for(auto v : mesh.vertices()) {            
+            for(auto h : mesh.halfedges(v)) {
+                pmp::Edge e = mesh.edge(h);
+                vertex_losses[v.idx()] += remesher->get_edge_loss(e);
+            }
+            vertex_losses[v.idx()] /= mesh.valence(v);
+        }
+        mesh_ps->addVertexScalarQuantity("Edge Loss", vertex_losses)->setColorMap("coolwarm");
+    }
+}
+
+} // namespace ba::ui
