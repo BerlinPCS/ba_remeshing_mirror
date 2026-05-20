@@ -29,7 +29,11 @@ struct IterationMetrics {
     double time_ms;
     double total_edge_loss;
     double volume_ratio;
+
+    // Geometry counts
     int vertex_count;
+    int edge_count;
+    int face_count;
     
     // Operation counts
     int split_count;

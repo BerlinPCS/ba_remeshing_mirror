@@ -2,23 +2,6 @@
 
 namespace ba {
 
-double Remesher::get_edge_loss(Edge e) {
-    // Currently using basic log10 of ratio between length and target length
-    
-    double ratio = edge_length(mesh, e) / target_length;
-    double loss = std::log2(std::max(0.001, std::min(1000.0, ratio)));
-    return loss * loss;
-}
-
-double Remesher::calc_total_edge_loss() {
-    double loss = 0;
-    for(auto e : mesh.edges()) {
-        loss += get_edge_loss(e);
-    }
-    edge_loss = loss;
-    return loss;
-}
-
 int Remesher::split_long_edges(){
     // Gather Relevant Edges to Split later
     std::vector<Edge> edges_to_split;
@@ -214,17 +197,19 @@ void Remesher::remesh(bool log_metrics, bool run_until_converged){
                 metrics.flip_count = -1;
                 metrics.smooth_count = -1;
             }
-            metrics.total_edge_loss = calc_total_edge_loss();
+            metrics.total_edge_loss = loss::calc_total_edge_loss(mesh, target_length);
             metrics.volume_ratio = volume_ratio(original_mesh, mesh);
             metrics.vertex_count = mesh.n_vertices();
+            metrics.edge_count = mesh.n_edges();
+            metrics.face_count = mesh.n_faces();
             logger.log_iteration(metrics);
             
-            if (progress_callback) progress_callback(i + 1, max_iters, get_total_edge_loss());
+            if (progress_callback) progress_callback(i + 1, max_iters, metrics.total_edge_loss);
         }
     } else {
         for(int i = 0; i < max_iters; i++) {
             single_iteration(metrics);
-            if (progress_callback) progress_callback(i + 1, max_iters, calc_total_edge_loss());
+            if (progress_callback) progress_callback(i + 1, max_iters, loss::calc_total_edge_loss(mesh, target_length));
         }
     }
 }

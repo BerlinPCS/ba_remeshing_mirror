@@ -1,5 +1,24 @@
 #include "ui/app_viewer.h"
-#include <algorithm>
+
+// Helper Function to Format File Names for ImGUI - not part of class
+std::string format_file_name(const std::string& name) {
+    std::string result;
+    bool capitalizeNext = true;
+    for (char ch : name) {
+        if (ch == '_' || ch == '-') {
+            result += ' ';
+            capitalizeNext = true;
+        } else {
+            if (capitalizeNext) {
+                result += std::toupper(ch);
+                capitalizeNext = false;
+            } else {
+                result += ch;
+            }
+        }
+    }
+    return result;
+}
 
 namespace ba::ui {
 
@@ -43,23 +62,21 @@ void AppViewer::load_mesh(const std::string& filepath) {
     polyscope::view::resetCameraToHomeView();
 }
 
-std::string format_file_name(const std::string& name) {
-    std::string result;
-    bool capitalizeNext = true;
-    for (char ch : name) {
-        if (ch == '_' || ch == '-') {
-            result += ' ';
-            capitalizeNext = true;
-        } else {
-            if (capitalizeNext) {
-                result += std::toupper(ch);
-                capitalizeNext = false;
-            } else {
-                result += ch;
-            }
-        }
+void AppViewer::add_vertex_loss() {
+    if (remesher && mesh_ps) {
+        std::vector<double> vertex_losses = loss::get_vertex_losses(mesh, remesher->get_target_length());
+        std::vector<double> sorted_losses = vertex_losses;
+        size_t idx = std::min(sorted_losses.size() - 1, (size_t)(sorted_losses.size() * 0.90));
+        std::nth_element(sorted_losses.begin(), sorted_losses.begin() + idx, sorted_losses.end());
+        
+        double min_val = *std::min_element(vertex_losses.begin(), vertex_losses.end());
+        double max_val = sorted_losses[idx];
+
+        mesh_ps->addVertexScalarQuantity("Edge Loss", vertex_losses)
+               ->setColorMap("coolwarm")
+               ->setMapRange({min_val, max_val}) 
+               ->setEnabled(true);
     }
-    return result;
 }
 
 void AppViewer::init() {
@@ -86,6 +103,18 @@ void AppViewer::init() {
 
 void AppViewer::draw_ui() {
     ImGui::BeginDisabled(is_remeshing);
+    draw_mesh_control();
+    ImGui::Separator(); 
+    ImGui::BeginDisabled(!remesher);
+        draw_remesh_control();
+        ImGui::Separator();
+        draw_visualization_control();
+    ImGui::EndDisabled(); // !remesher
+    ImGui::EndDisabled(); // is_remeshing
+    condition_updates();
+}
+
+void AppViewer::draw_mesh_control() {
     ImGui::Text("Meshes:");
     static std::vector<const char*> names;
     names.clear();
@@ -111,40 +140,18 @@ void AppViewer::draw_ui() {
     if (ImGui::Button("Reset Mesh")) {
         load_mesh(file_paths[selected_mesh]);
     }
+}
 
-
-    ImGui::Separator(); 
-    ImGui::Text("Single Operations:");
-    if (ImGui::Button("Split Long Edges")) {
-        remesher->split_long_edges();
-        update_polyscope(); 
-    }
-    ImGui::SameLine();
-    if (ImGui::Button("Collapse Short Edges")) {
-        remesher->collapse_short_edges();
-        update_polyscope(); 
-    }
-    ImGui::SameLine();
-    if (ImGui::Button("Flip Edges")) {
-        remesher->flip_edges();
-        update_polyscope(); 
-    }
-    ImGui::SameLine();
-    if (ImGui::Button("Smooth Vertices")) {
-        remesher->smooth_vertices();
-        update_polyscope(); 
-    }
-
-
-    ImGui::Separator();
+void AppViewer::draw_remesh_control() {
     ImGui::Text("Remeshing:");
-    if (ImGui::Button("Run 1 Iteration")) {
+    if (ImGui::Button("Iterate")) {
         remesher->single_iteration();
         update_polyscope(); 
     }
     ImGui::SameLine();
     
-    if (ImGui::Button("Remesh") && remesher) {
+    // Remeshing creates a new thread so ui doesnt freeze
+    if (ImGui::Button("Remesh")) {
         if(export_vtk) io::remove_vtks("../../out/vtk");
         is_remeshing = true;
         current_progress_iter = 0;
@@ -155,7 +162,7 @@ void AppViewer::draw_ui() {
             total_progress_iters = total;
             current_progress_loss = loss;
             if (export_vtk) {
-                std::vector<double> vertex_losses = get_vertex_losses();
+                std::vector<double> vertex_losses = loss::get_vertex_losses(mesh, remesher->get_target_length());
                 if(!vertex_losses.empty()) {
                     std::ostringstream s;
                     s << "../../out/vtk/exported_mesh_" << std::setfill('0') << std::setw(4) 
@@ -177,11 +184,9 @@ void AppViewer::draw_ui() {
     ImGui::BeginDisabled(run_until_converged);
     ImGui::SameLine();
     ImGui::SetNextItemWidth(25.0);
-    if (remesher) {
-        int iterations_input = remesher->get_iterations();
-        if (ImGui::InputInt("Iters", &iterations_input, 0)) {
-            remesher->set_iterations(iterations_input);
-        }
+    int iterations_input = remesher->get_iterations();
+    if (ImGui::InputInt("# Iterations", &iterations_input, 0)) {
+        remesher->set_iterations(iterations_input);
     }
     ImGui::EndDisabled();
     ImGui::SameLine();
@@ -191,27 +196,42 @@ void AppViewer::draw_ui() {
     ImGui::SameLine();
     ImGui::Checkbox("VTK", &export_vtk);
 
-    ImGui::Separator();
-    ImGui::Text("Visualisation:");
-    ImGui::Checkbox("Show Vertex Loss", &show_vertex_loss);
-    if (show_vertex_loss && !has_vertex_loss) {
-        add_vertex_loss();
-        has_vertex_loss = true;
-    } else if (!show_vertex_loss && has_vertex_loss) {
-        mesh_ps->getQuantity("Edge Loss")->setEnabled(false);
-        mesh_ps->removeQuantity("Edge Loss");
-        has_vertex_loss = false;
+    ImGui::Text("Operations:");
+    if (ImGui::Button("Split")) {
+        remesher->split_long_edges();
+        update_polyscope(); 
     }
     ImGui::SameLine();
+    if (ImGui::Button("Collapse")) {
+        remesher->collapse_short_edges();
+        update_polyscope(); 
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Flip")) {
+        remesher->flip_edges();
+        update_polyscope(); 
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Smooth")) {
+        remesher->smooth_vertices();
+        update_polyscope(); 
+    }
+}
+
+void AppViewer::draw_visualization_control() {
+    ImGui::Text("Visualisation:");
+    ImGui::Checkbox("Show Vertex Loss", &show_vertex_loss);
+    ImGui::SameLine();
     if (ImGui::Button("Export Mesh to .vtk")) {
-        std::vector<double> vertex_losses = get_vertex_losses();
+        std::vector<double> vertex_losses = loss::get_vertex_losses(mesh, remesher->get_target_length());
         if(!vertex_losses.empty()) {
             io::export_mesh_vtk("../../out/vtk/exported_mesh.vtk", mesh, vertex_losses);
         }
     }
+}
 
-    ImGui::EndDisabled();
-    
+void AppViewer::condition_updates(){
+    // Popup while remeshing
     if (ImGui::BeginPopupModal("Remeshing Progress", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::Text("Remeshing in progress...");
         int cur = current_progress_iter.load();
@@ -231,39 +251,17 @@ void AppViewer::draw_ui() {
         update_polyscope();
         remesh_finished = false;
     }
-}
 
-std::vector<double> AppViewer::get_vertex_losses() {
-    std::vector<double> vertex_losses;
-    if(remesher) {
-        vertex_losses.resize(mesh.vertices_size(), 0.0);
-        for(auto v : mesh.vertices()) {
-            for(auto h : mesh.halfedges(v)) {
-                pmp::Edge e = mesh.edge(h);
-                vertex_losses[v.idx()] += remesher->get_edge_loss(e);
-            }
-            if (mesh.valence(v) > 0) {
-                vertex_losses[v.idx()] /= mesh.valence(v);
-            }
-        }
-    } 
-    return vertex_losses;
-}
-
-void AppViewer::add_vertex_loss() {
-    if (remesher && mesh_ps) {
-        std::vector<double> vertex_losses = get_vertex_losses(), sorted_losses = vertex_losses;
-        size_t idx = std::min(sorted_losses.size() - 1, (size_t)(sorted_losses.size() * 0.90));
-        std::nth_element(sorted_losses.begin(), sorted_losses.begin() + idx, sorted_losses.end());
-        
-        double min_val = *std::min_element(vertex_losses.begin(), vertex_losses.end());
-        double max_val = sorted_losses[idx];
-
-        mesh_ps->addVertexScalarQuantity("Edge Loss", vertex_losses)
-               ->setColorMap("coolwarm")
-               ->setMapRange({min_val, max_val}) 
-               ->setEnabled(true);
+    // Update Vertex Loss Quantity based on UI Selection
+    if (show_vertex_loss && !has_vertex_loss) {
+        add_vertex_loss();
+        has_vertex_loss = true;
+    } else if (!show_vertex_loss && has_vertex_loss) {
+        mesh_ps->getQuantity("Edge Loss")->setEnabled(false);
+        mesh_ps->removeQuantity("Edge Loss");
+        has_vertex_loss = false;
     }
 }
+
 
 } // namespace ba::ui

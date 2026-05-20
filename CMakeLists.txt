@@ -94,6 +94,7 @@ add_executable(
     src/core/geo_utils.cpp
     src/ui/app_viewer.cpp
     src/remesher/remesher.cpp
+    src/remesher/loss.cpp
     src/io/logger.cpp
     src/io/paraview.cpp
 )

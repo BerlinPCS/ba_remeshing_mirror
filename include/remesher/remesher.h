@@ -6,6 +6,7 @@
 #include "core/types.h"
 #include "core/geo_utils.h"
 #include "io/logger.h"
+#include "remesher/loss.h"
 
 namespace ba
 {
@@ -17,27 +18,21 @@ private:
     double target_length;
     const double l_max = 1.3333;
     const double l_min = 0.8;
-    double edge_loss = 0;
     int iterations = 5;
     
     // Callback for progress updates in ui thread
     std::function<void(int, int, double)> progress_callback = nullptr;
 
-    /**
-     * \brief Calculates the total edge loss for the mesh.
-     *
-     * \return The total loss value as a double.
-     */
-    double calc_total_edge_loss();
-
 public:
 
-    /**
-     * \brief Gets the loss of a single edge 
-     *
-     * \return The loss value as a double.
-     */
-    double get_edge_loss(Edge e);
+    //Getters
+    int get_iterations() const { return iterations; }
+    double get_target_length() { return target_length; }
+
+    //Setters
+    void set_iterations(int i) { iterations = i; }
+    void set_target_length(double t) { target_length = t; }
+    void set_progress_callback(std::function<void(int, int, double)> cb) { progress_callback = cb; }
 
     /**
      * \brief Splits long edges that exceed 4/3rds of the target length.
@@ -61,20 +56,6 @@ public:
      * \brief Smoothes the vertices.
      */
     int smooth_vertices();
-
-    /**
-     * \brief Gets the current total mesh loss / entropy. 
-     *
-     * \return The current loss value as a double.
-     */
-    double get_total_edge_loss() const { return edge_loss; }
-
-    int get_iterations() const { return iterations; }
-    void set_iterations(int i) { iterations = i; }
-    double get_target_length() { return target_length; }
-    void set_target_length(double t) { target_length = t; }
-    
-    void set_progress_callback(std::function<void(int, int, double)> cb) { progress_callback = cb; }
 
     /**
      * \brief Performs a single iteration of the isotropic remeshing algorithm

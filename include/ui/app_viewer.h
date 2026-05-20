@@ -16,6 +16,7 @@
 #include <pmp/io/io.h>
 #include "polyscope/polyscope.h"
 #include "portable-file-dialogs.h"
+#include "remesher/loss.h"
 
 namespace ba::ui {
 
@@ -56,8 +57,6 @@ namespace ba::ui {
          */
         ps::SurfaceMesh* update_polyscope();
 
-        std::vector<double> get_vertex_losses();
-
         /**
          * Adds a scalar quantity to the mesh representing the loss associated with each vertex.
          * This is averaged over the edge loss of all edges incident to the vertex.
@@ -66,9 +65,13 @@ namespace ba::ui {
 
         /**
          * \brief Callback function for the ImGui UI. 
-         * This is where all Elements get drawn
          */
         void draw_ui();
+        void draw_mesh_control();
+        void draw_remesh_control();
+        void draw_visualization_control();
+        void condition_updates(); // update output based on current ui state
+
 
     public:
         /**
