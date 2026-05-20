@@ -2,29 +2,33 @@
 
 namespace ba::io {
 
-void remove_vtks(const std::string& path) {
-    if (!std::filesystem::exists(path)) {
-        std::filesystem::create_directories(path);
+void remove_vtks() {
+    if (!std::filesystem::exists(OUT_VTK_DIR)) {
+        std::filesystem::create_directories(OUT_VTK_DIR);
     }
-    for (const auto& entry : std::filesystem::recursive_directory_iterator(path)) {
+    for (const auto& entry : std::filesystem::recursive_directory_iterator(OUT_VTK_DIR)) {
         if (entry.path().extension() == ".vtk") {
             std::filesystem::remove(entry.path());
         }
     }
 }
 
-void export_mesh_vtk(const std::string& filepath, 
+void export_mesh_vtk(const std::string& filename, 
                      pmp::SurfaceMesh& mesh, 
-                     const std::vector<double>& vertex_losses) {
+                     const std::vector<double>& vertex_losses,
+                     int current_iteration) {
                                   
-    std::filesystem::path path(filepath);
-    if (path.has_parent_path()) {
-        std::filesystem::create_directories(path.parent_path());
+    if (!std::filesystem::exists(OUT_VTK_DIR)) {
+        std::filesystem::create_directories(OUT_VTK_DIR);
     }
 
-    std::ofstream out(filepath);
+    std::ostringstream path;
+    path << OUT_VTK_DIR << filename;
+    if(current_iteration >= 0) path << "_" << std::setfill('0') << std::setw(4) << current_iteration;
+    path << ".vtk";
+    std::ofstream out(path.str());
     if (!out.is_open()) {
-        std::cerr << "[VTK Exporter] ERROR: Could not open file " << filepath << std::endl;
+        std::cerr << "[VTK Exporter] ERROR: Could not open file " << path.str() << std::endl;
         return;
     }
 
@@ -84,7 +88,7 @@ void export_mesh_vtk(const std::string& filepath,
     }
 
     out.close();
-    std::cout << "[VTK Exporter] Successfully wrote: " << filepath << std::endl;
+    std::cout << "[VTK Exporter] Successfully wrote: " << path.str() << std::endl;
 }
 
 } // namespace ba

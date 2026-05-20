@@ -3,6 +3,7 @@
 #include <memory>
 #include <algorithm>
 #include <string>
+#include <sstream>
 #include <vector>
 #include <unordered_set>
 #include <atomic>
@@ -12,11 +13,12 @@
 #include "core/types.h"
 #include "remesher/remesher.h"
 #include "io/paraview.h"
+#include "io/logger.h"
+#include "remesher/loss.h"
 
 #include <pmp/io/io.h>
 #include "polyscope/polyscope.h"
 #include "portable-file-dialogs.h"
-#include "remesher/loss.h"
 
 namespace ba::ui {
 
@@ -29,24 +31,19 @@ namespace ba::ui {
         std::string path_to_data;
         std::vector<std::string> file_paths;
         std::vector<std::string> mesh_names;
+        std::string current_file_name;
         int selected_mesh = 0;
-        bool show_vertex_loss = false, has_vertex_loss = false;
-        bool log_csv = false, run_until_converged = false, export_vtk = false;
+        bool show_vertex_loss = false;
+        bool logging = true, run_until_converged = false;
+        std::unique_ptr<io::Logger> logger;
+        std::atomic<int> current_total_iters{0};
         
         std::atomic<bool> is_remeshing{false};
         std::atomic<bool> remesh_finished{false};
         std::atomic<int> current_progress_iter{0};
         std::atomic<int> total_progress_iters{100};
         std::atomic<double> current_progress_loss{0.0};
-
-        /**
-         * \brief Loads a mesh based on a .obj, .stl, or .off file. 
-         * Creates a new remesher instance for the loaded mesh.
-         * 
-         * \param filepath The path to the mesh file.
-         * \returns A pointer to the remesher instance for inline operations
-         */
-        void load_mesh(const std::string& file_path);
+        IterationMetrics metrics;
 
         /**
          * \brief Loads the given pmp::SurfaceMesh into Polyscope.
@@ -64,6 +61,13 @@ namespace ba::ui {
         void add_vertex_loss();
 
         /**
+         * Reset UI state and load a mesh 
+         */
+        void reset(const std::string& filepath = "");
+
+        void log(bool initial_log = false);
+
+        /**
          * \brief Callback function for the ImGui UI. 
          */
         void draw_ui();
@@ -78,7 +82,7 @@ namespace ba::ui {
          * \brief Constructor for UI
          * \param path_to_data Path to the directory containing .off files. Defaults to "./data"
          */
-        AppViewer(std::string path_to_data = "../../data") : path_to_data(path_to_data) {}
+        AppViewer(std::string path_to_data = DATA_DIR) : path_to_data(path_to_data) {}
 
         /**
          * \brief Initializes Polyscope, registers the point cloud, and sets the callback

@@ -2,7 +2,7 @@
 /.cache/
 /.vscode/
 .venv/
-/logs/
+out/logs/
 out/vtk/
 /tmp/
 .polyscope.ini

@@ -6,6 +6,9 @@
 #include "polyscope/surface_mesh.h"
 
 #define ps polyscope
+#define OUT_VTK_DIR "../../out/vtk/"
+#define OUT_LOG_DIR "../../out/logs/"
+#define DATA_DIR "../../data/"
 
 namespace ba {
 
@@ -25,10 +28,10 @@ using vec2 = pmp::vec2;
  * \brief A struct to hold metrics for a single iteration.
  */
 struct IterationMetrics {
-    int iteration_num;
-    double time_ms;
-    double total_edge_loss;
-    double volume_ratio;
+    int iteration_num = 0;
+    double time_ms = -1;
+    double total_edge_loss = -1;
+    double volume_ratio = 1;
 
     // Geometry counts
     int vertex_count;
@@ -36,10 +39,10 @@ struct IterationMetrics {
     int face_count;
     
     // Operation counts
-    int split_count;
-    int collapse_count;
-    int flip_count;
-    int smooth_count;
+    int split_count = -1;
+    int collapse_count = -1;
+    int flip_count = -1;
+    int smooth_count = -1;
 };
 
 } // namespace ba

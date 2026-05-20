@@ -44,26 +44,16 @@ ps::SurfaceMesh* AppViewer::update_polyscope() {
         faces.push_back(std::move(face_indices));
     }
 
-    mesh_ps = polyscope::registerSurfaceMesh("mesh", vertices, faces);
+    mesh_ps = ps::registerSurfaceMesh("mesh", vertices, faces);
     
     if (show_vertex_loss) {
         add_vertex_loss();
-        has_vertex_loss = true;
     }
     return mesh_ps;
 }
 
-void AppViewer::load_mesh(const std::string& filepath) {
-    mesh.clear();
-    pmp::read(mesh, filepath);
-    remesher = std::make_unique<ba::Remesher>(mesh);
-    has_vertex_loss = false; 
-    update_polyscope()->setEdgeWidth(1.0);
-    polyscope::view::resetCameraToHomeView();
-}
-
 void AppViewer::add_vertex_loss() {
-    if (remesher && mesh_ps) {
+    if (remesher && mesh_ps && mesh.n_vertices() > 0) {
         std::vector<double> vertex_losses = loss::get_vertex_losses(mesh, remesher->get_target_length());
         std::vector<double> sorted_losses = vertex_losses;
         size_t idx = std::min(sorted_losses.size() - 1, (size_t)(sorted_losses.size() * 0.90));
@@ -92,24 +82,52 @@ void AppViewer::init() {
         }
     }
 
-    polyscope::options::groundPlaneMode = polyscope::GroundPlaneMode::ShadowOnly;
-    polyscope::options::shadowBlurIters = 6;
-    polyscope::init();
-    if (!file_paths.empty()) {
-        load_mesh(file_paths[0]);
+    ps::options::groundPlaneMode = ps::GroundPlaneMode::ShadowOnly;
+    ps::options::shadowBlurIters = 6;
+    ps::init();
+    if (!file_paths.empty()) reset();
+    else ps::error("No valid mesh files found.");
+    ps::state::userCallback = [this]() { this->draw_ui(); };
+}
+
+void AppViewer::reset(const std::string& file_path){
+    current_total_iters = 0;
+    is_remeshing = false;
+    remesh_finished = false;
+    current_progress_iter = 0;
+    total_progress_iters = 100;
+    io::remove_vtks();
+    mesh.clear();
+    pmp::read(mesh, file_path.empty() ? file_paths[selected_mesh] : file_path);
+    remesher = std::make_unique<ba::Remesher>(mesh);
+    update_polyscope()->setEdgeWidth(1.0);
+    ps::view::resetCameraToHomeView();
+
+    // Log initial values
+    current_file_name = std::filesystem::path(file_paths[selected_mesh]).stem().string();
+    logger = std::make_unique<io::Logger>(OUT_LOG_DIR "results_" + current_file_name + ".csv");
+    metrics = remesher->get_metrics();
+    log(true);
+}
+
+void AppViewer::log(bool initial_log) {
+    metrics.iteration_num = current_total_iters;
+    if (initial_log || logging) {
+        if (logger) logger->log_iteration(metrics);
+        io::export_mesh_vtk(current_file_name, mesh, loss::get_vertex_losses(mesh, remesher->get_target_length()), current_total_iters);
     }
-    polyscope::state::userCallback = [this]() { this->draw_ui(); };
+    current_total_iters++;
 }
 
 void AppViewer::draw_ui() {
     ImGui::BeginDisabled(is_remeshing);
-    draw_mesh_control();
-    ImGui::Separator(); 
-    ImGui::BeginDisabled(!remesher);
-        draw_remesh_control();
-        ImGui::Separator();
-        draw_visualization_control();
-    ImGui::EndDisabled(); // !remesher
+        draw_mesh_control();
+        ImGui::Separator(); 
+        ImGui::BeginDisabled(!remesher);
+            draw_remesh_control();
+            ImGui::Separator();
+            draw_visualization_control();
+        ImGui::EndDisabled(); // !remesher
     ImGui::EndDisabled(); // is_remeshing
     condition_updates();
 }
@@ -120,9 +138,7 @@ void AppViewer::draw_mesh_control() {
     names.clear();
     for (const auto& name : mesh_names) names.push_back(name.c_str());
     ImGui::SetNextItemWidth(180.0f);
-    if (ImGui::Combo("##mesh_selector", &selected_mesh, names.data(), (int)names.size())) {
-        load_mesh(file_paths[selected_mesh]);
-    }
+    if (ImGui::Combo("##mesh_selector", &selected_mesh, names.data(), (int)names.size())) reset();
     ImGui::SameLine();
     if (ImGui::Button("Load from File")) {
         auto paths = pfd::open_file(
@@ -134,11 +150,11 @@ void AppViewer::draw_mesh_control() {
                 "All files (*.*)", "*.*"
             }, pfd::opt::none
         ).result();
-        if (!paths.empty()) load_mesh(paths[0]);
+        if (!paths.empty()) reset(paths[0]);
     }
     ImGui::SameLine();
     if (ImGui::Button("Reset Mesh")) {
-        load_mesh(file_paths[selected_mesh]);
+        reset();
     }
 }
 
@@ -146,34 +162,27 @@ void AppViewer::draw_remesh_control() {
     ImGui::Text("Remeshing:");
     if (ImGui::Button("Iterate")) {
         remesher->single_iteration();
+        metrics = remesher->get_metrics();
+        log();
         update_polyscope(); 
     }
     ImGui::SameLine();
     
     // Remeshing creates a new thread so ui doesnt freeze
     if (ImGui::Button("Remesh")) {
-        if(export_vtk) io::remove_vtks("../../out/vtk");
         is_remeshing = true;
         current_progress_iter = 0;
         total_progress_iters = (run_until_converged ? 100 : remesher->get_iterations());
         
-        remesher->set_progress_callback([this](int cur, int total, double loss) {
+        remesher->set_progress_callback([this](int cur, IterationMetrics met) {
             current_progress_iter = cur;
-            total_progress_iters = total;
-            current_progress_loss = loss;
-            if (export_vtk) {
-                std::vector<double> vertex_losses = loss::get_vertex_losses(mesh, remesher->get_target_length());
-                if(!vertex_losses.empty()) {
-                    std::ostringstream s;
-                    s << "../../out/vtk/exported_mesh_" << std::setfill('0') << std::setw(4) 
-                      << current_progress_iter << ".vtk";
-                    io::export_mesh_vtk(s.str(), mesh, vertex_losses);
-                }
-            }
+            current_progress_loss = met.total_edge_loss;
+            metrics = met;
+            log();
         });
         
         std::thread([this]() {
-            remesher->remesh(log_csv, run_until_converged);
+            remesher->remesh(run_until_converged);
             is_remeshing = false;
             remesh_finished = true;
         }).detach();
@@ -192,10 +201,9 @@ void AppViewer::draw_remesh_control() {
     ImGui::SameLine();
     ImGui::Checkbox("Converge", &run_until_converged);
     ImGui::SameLine();
-    ImGui::Checkbox("CSV", &log_csv);
-    ImGui::SameLine();
-    ImGui::Checkbox("VTK", &export_vtk);
+    ImGui::Checkbox("Log Data", &logging);
 
+    ImGui::BeginDisabled(logging);
     ImGui::Text("Operations:");
     if (ImGui::Button("Split")) {
         remesher->split_long_edges();
@@ -216,17 +224,23 @@ void AppViewer::draw_remesh_control() {
         remesher->smooth_vertices();
         update_polyscope(); 
     }
+    ImGui::EndDisabled(); // logging
 }
 
 void AppViewer::draw_visualization_control() {
     ImGui::Text("Visualisation:");
-    ImGui::Checkbox("Show Vertex Loss", &show_vertex_loss);
+    if(ImGui::Checkbox("Show Vertex Loss", &show_vertex_loss)) {
+        if (show_vertex_loss) {
+            add_vertex_loss();
+        } else {
+            mesh_ps->getQuantity("Edge Loss")->setEnabled(false);
+            mesh_ps->removeQuantity("Edge Loss");
+        }
+    }
     ImGui::SameLine();
     if (ImGui::Button("Export Mesh to .vtk")) {
-        std::vector<double> vertex_losses = loss::get_vertex_losses(mesh, remesher->get_target_length());
-        if(!vertex_losses.empty()) {
-            io::export_mesh_vtk("../../out/vtk/exported_mesh.vtk", mesh, vertex_losses);
-        }
+        std::string safe_name = std::filesystem::path(file_paths[selected_mesh]).stem().string();
+        io::export_mesh_vtk(safe_name, mesh, loss::get_vertex_losses(mesh, remesher->get_target_length()));
     }
 }
 
@@ -240,7 +254,6 @@ void AppViewer::condition_updates(){
         ImGui::ProgressBar(progress, ImVec2(250.0f, 0.0f));
         ImGui::Text("Iteration: %d / %d", cur, total);
         ImGui::Text("Total Edge Loss: %.4f", current_progress_loss.load());
-        
         if (!is_remeshing) {
             ImGui::CloseCurrentPopup();
         }
@@ -250,16 +263,6 @@ void AppViewer::condition_updates(){
     if (remesh_finished) {
         update_polyscope();
         remesh_finished = false;
-    }
-
-    // Update Vertex Loss Quantity based on UI Selection
-    if (show_vertex_loss && !has_vertex_loss) {
-        add_vertex_loss();
-        has_vertex_loss = true;
-    } else if (!show_vertex_loss && has_vertex_loss) {
-        mesh_ps->getQuantity("Edge Loss")->setEnabled(false);
-        mesh_ps->removeQuantity("Edge Loss");
-        has_vertex_loss = false;
     }
 }
 

@@ -165,51 +165,38 @@ int Remesher::smooth_vertices(){
     return count;
 }
 
-void Remesher::single_iteration(IterationMetrics &metrics){
+void Remesher::set_metrics() {
+    metrics.total_edge_loss = loss::calc_total_edge_loss(mesh, target_length);
+    metrics.volume_ratio = volume_ratio(original_mesh, mesh);
+    metrics.vertex_count = mesh.n_vertices();
+    metrics.edge_count = mesh.n_edges();
+    metrics.face_count = mesh.n_faces();
+}
+
+void Remesher::single_iteration(){
+    auto start = std::chrono::high_resolution_clock::now();
     metrics.split_count = split_long_edges();
     metrics.collapse_count = collapse_short_edges();
     metrics.flip_count = flip_edges();
     metrics.smooth_count = smooth_vertices();
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsed = end - start;
+    metrics.time_ms = elapsed.count() * 1000;
+    set_metrics();
 }
 
-void Remesher::single_iteration(){
-    IterationMetrics dummy_metrics;
-    single_iteration(dummy_metrics);
-}
-
-void Remesher::remesh(bool log_metrics, bool run_until_converged){
-    IterationMetrics metrics;
-    int max_iters = (run_until_converged ? 100 : iterations + 1);
-    if(log_metrics) {
-        io::Logger logger("../../out/logs/results_standard.csv");
-        for(int i = 0; i < max_iters; i++) {
-            metrics.iteration_num = i;
-            if(i > 0) {
-                auto start = std::chrono::high_resolution_clock::now();
-                single_iteration(metrics);
-                auto end = std::chrono::high_resolution_clock::now();
-                std::chrono::duration<double> elapsed = end - start;
-                metrics.time_ms = elapsed.count() * 1000;
-            } else {
-                metrics.time_ms = -1;
-                metrics.split_count = -1;
-                metrics.collapse_count = -1;
-                metrics.flip_count = -1;
-                metrics.smooth_count = -1;
+void Remesher::remesh(bool run_until_converged){
+    int max_iters = (run_until_converged ? 100 : iterations);
+    
+    double prev_loss = -1.0;
+    for(int i = 0; i < max_iters; i++) {
+        single_iteration();
+        if (progress_callback) progress_callback(i + 1, metrics);
+        if (run_until_converged) {
+            if (prev_loss >= 0.0 && std::abs(prev_loss - metrics.total_edge_loss) < 1e-4) {
+                break; // Loss stabilized, exit early
             }
-            metrics.total_edge_loss = loss::calc_total_edge_loss(mesh, target_length);
-            metrics.volume_ratio = volume_ratio(original_mesh, mesh);
-            metrics.vertex_count = mesh.n_vertices();
-            metrics.edge_count = mesh.n_edges();
-            metrics.face_count = mesh.n_faces();
-            logger.log_iteration(metrics);
-            
-            if (progress_callback) progress_callback(i + 1, max_iters, metrics.total_edge_loss);
-        }
-    } else {
-        for(int i = 0; i < max_iters; i++) {
-            single_iteration(metrics);
-            if (progress_callback) progress_callback(i + 1, max_iters, loss::calc_total_edge_loss(mesh, target_length));
+            prev_loss = metrics.total_edge_loss;
         }
     }
 }

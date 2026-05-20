@@ -3,8 +3,10 @@
 #include <iostream>
 #include <functional>
 #include <chrono>
+#include <atomic>
 #include "core/types.h"
 #include "core/geo_utils.h"
+#include "io/paraview.h"
 #include "io/logger.h"
 #include "remesher/loss.h"
 
@@ -19,20 +21,24 @@ private:
     const double l_max = 1.3333;
     const double l_min = 0.8;
     int iterations = 5;
+    IterationMetrics metrics = IterationMetrics();
     
     // Callback for progress updates in ui thread
-    std::function<void(int, int, double)> progress_callback = nullptr;
+    std::function<void(int, IterationMetrics)> progress_callback = nullptr;
+
+    void set_metrics();
 
 public:
 
     //Getters
     int get_iterations() const { return iterations; }
     double get_target_length() { return target_length; }
+    IterationMetrics get_metrics() { return metrics; }
 
     //Setters
     void set_iterations(int i) { iterations = i; }
     void set_target_length(double t) { target_length = t; }
-    void set_progress_callback(std::function<void(int, int, double)> cb) { progress_callback = cb; }
+    void set_progress_callback(std::function<void(int, IterationMetrics)> cb) { progress_callback = cb; }
 
     /**
      * \brief Splits long edges that exceed 4/3rds of the target length.
@@ -66,11 +72,6 @@ public:
      * 3. Flipping edges to improve valence of vertices
      * 4. Tangential Smoothing to improve triangle area
      */
-    void single_iteration(IterationMetrics &metrics);
-
-    /**
-     * \brief Performs a single iteration of the isotropic remeshing algorithm without recording metrics.
-     */
     void single_iteration();
 
     /**
@@ -80,9 +81,12 @@ public:
      * the single_iteration() function will be called that many times. Otherwise 
      * it will continue untill the loss function has converged.
      */
-    void remesh(bool log_metrics = false, bool run_until_converged = false);
+    void remesh(bool run_until_converged);
     
-    Remesher(Mesh& m) : mesh(m), original_mesh(m) { target_length = avg_edge_length(m); }
+    Remesher(Mesh& m) : mesh(m), original_mesh(m) { 
+        target_length = avg_edge_length(m); 
+        set_metrics();
+    }
 };
 
 } //namespace ba
