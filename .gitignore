@@ -7,4 +7,4 @@ out/vtk/
 /tmp/
 .polyscope.ini
 imgui.ini
-*.txt
+*.MD

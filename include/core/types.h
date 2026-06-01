@@ -5,10 +5,17 @@
 #include "polyscope/polyscope.h"
 #include "polyscope/surface_mesh.h"
 
+#include <queue>
+
 #define ps polyscope
+
 #define OUT_VTK_DIR "../../out/vtk/"
 #define OUT_LOG_DIR "../../out/logs/"
 #define DATA_DIR "../../data/"
+
+#define BASE 0
+#define PRIORITY_LOCAL 1
+#define PRIORITY_GLOBAL 2
 
 namespace ba {
 
@@ -44,5 +51,41 @@ struct IterationMetrics {
     int flip_count = -1;
     int smooth_count = -1;
 };
+
+// Types for Operation Ordering
+enum class OpType { Split, Collapse, Flip, Smooth };
+class OpCandidate {
+public:
+    OpCandidate(OpType t, Vertex v) : type(t), v(v) { validate(); }
+    OpCandidate(OpType t, Edge e) : type(t), e(e) { validate(); }
+
+    OpType type;
+    Edge e = Edge();
+    Vertex v = Vertex();
+    double score;
+private:
+    void validate() {
+        switch (type) {
+            case OpType::Split:
+                if(!e.is_valid()) throw std::invalid_argument("Invalid edge for split operation");
+                break;
+            case OpType::Collapse:
+                if(!e.is_valid()) throw std::invalid_argument("Invalid edge for collapse operation");
+                break;
+            case OpType::Flip:
+                if(!e.is_valid()) throw std::invalid_argument("Invalid edge for flip operation");
+                break;
+            case OpType::Smooth:
+                if(!v.is_valid()) throw std::invalid_argument("Invalid vertex for smooth operation");
+                break;
+        }
+    }
+};
+struct OpCompare {
+    bool operator()(const OpCandidate& a, const OpCandidate& b) const {
+        return a.score < b.score;
+    }
+};
+using OpQueue = std::priority_queue<OpCandidate, std::vector<OpCandidate>, OpCompare>;
 
 } // namespace ba

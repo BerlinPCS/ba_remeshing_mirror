@@ -86,9 +86,7 @@ void export_mesh_vtk(const std::string& filename,
             }
         }
     }
-
     out.close();
-    std::cout << "[VTK Exporter] Successfully wrote: " << path.str() << std::endl;
 }
 
 } // namespace ba

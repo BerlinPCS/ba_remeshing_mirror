@@ -63,9 +63,8 @@ def generate_thesis_plots(csv_files, output_filename="../out/plots/remeshing_res
 
 if __name__ == "__main__":
     files_to_plot = {
-        "../out/logs/results_standard.csv": "Base Algorithm",
-        # "../out/logs/results_priority.csv": "Priority Queue",
-        # "../out/logs/results_curvature.csv": "Curvature Adaptive"
+        "../out/logs/results_standard_stanford-bunny.csv": "Standard",
+        "../out/logs/results_priority_local_stanford-bunny.csv": "Priority Local"
     }
     
     generate_thesis_plots(files_to_plot)

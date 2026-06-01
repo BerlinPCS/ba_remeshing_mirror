@@ -15,9 +15,19 @@ namespace ba::loss {
 double get_edge_loss(const Mesh& mesh, Edge e, double target_length);
 
 /**
+ * \brief Calculates the loss for a given edge length.
+ */
+double get_edge_loss_from_length(double length, double target_length);
+
+/**
  * \brief Calculates the total edge loss for the mesh.
  */
 double calc_total_edge_loss(const Mesh& mesh, double target_length);
+
+/**
+ * \brief Gets the average edge loss for a single vertex
+ */
+double single_vertex_loss(const Mesh& mesh, double target_length, Vertex v);
 
 /**
  * \brief Calculates the average edge loss for each vertex.

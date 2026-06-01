@@ -15,6 +15,7 @@
 #include "io/paraview.h"
 #include "io/logger.h"
 #include "remesher/loss.h"
+#include "ui/visuals.h"
 
 #include <pmp/io/io.h>
 #include "polyscope/polyscope.h"
@@ -26,46 +27,37 @@ namespace ba::ui {
     private:
         // Application State 
         Mesh mesh;
-        ps::SurfaceMesh* mesh_ps;
         std::unique_ptr<Remesher> remesher;
+        int remesher_type = BASE;
+        std::vector<std::string> strategies = {"standard", "priority_local", "priority_global"};
         std::string path_to_data;
         std::vector<std::string> file_paths;
         std::vector<std::string> mesh_names;
         std::string current_file_name;
+
+        // Remesher State
         int selected_mesh = 0;
         bool show_vertex_loss = false;
-        bool logging = true, run_until_converged = false;
+        bool run_until_converged = false;
+        int iterations = 5;
+        int flip_frequency = 5;
+
+        // Logging
+        bool logging = true, vtk_export = false;
         std::unique_ptr<io::Logger> logger;
         std::atomic<int> current_total_iters{0};
-        
         std::atomic<bool> is_remeshing{false};
-        std::atomic<bool> remesh_finished{false};
         std::atomic<int> current_progress_iter{0};
         std::atomic<int> total_progress_iters{100};
         std::atomic<double> current_progress_loss{0.0};
         IterationMetrics metrics;
 
         /**
-         * \brief Loads the given pmp::SurfaceMesh into Polyscope.
-         * Converts the halfedge data structure to the format expected by Polyscope.
-         * 
-         * \param mesh_name The name to be given to the mesh in Polyscope
-         * \returns A pointer to the registered Polyscope mesh for inline operations
-         */
-        ps::SurfaceMesh* update_polyscope();
-
-        /**
-         * Adds a scalar quantity to the mesh representing the loss associated with each vertex.
-         * This is averaged over the edge loss of all edges incident to the vertex.
-         */
-        void add_vertex_loss();
-
-        /**
          * Reset UI state and load a mesh 
          */
         void reset(const std::string& filepath = "");
 
-        void log(bool initial_log = false);
+        void log(IterationMetrics metrics, bool initial_log = false);
 
         /**
          * \brief Callback function for the ImGui UI. 
