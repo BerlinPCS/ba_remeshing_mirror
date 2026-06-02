@@ -68,7 +68,9 @@ void AppViewer::reset(const std::string& file_path){
     if (split_strategy == SPLIT_SUM) {
         evaluator = std::make_shared<SplitSumEvaluation>();
     } else if (split_strategy == SPLIT_MAX) {
-        //evaluator = std::make_shared<SplitMaxEvaluation>();
+        evaluator = std::make_shared<SplitMaxEvaluation>();
+    } else if (split_strategy == SPLIT_AVG) {
+        evaluator = std::make_shared<SplitAvgEvaluation>();
     }
     if (remesher_type == PRIORITY_LOCAL) {
         remesher = std::make_unique<RemesherPrioLocal>(mesh, evaluator);
@@ -145,15 +147,12 @@ void AppViewer::draw_mesh_control() {
 
 void AppViewer::draw_remesh_control() {
     ImGui::Text("Remeshing:");
-    int previous_type = remesher_type; // TODO: Perhaps remove
     ImGui::SetNextItemWidth(180.0f);
     static std::vector<const char*> names;
     names.clear();
     for (const auto& name : remesher_names) names.push_back(name.c_str());
-    ImGui::Combo("##remesher_strategy", &remesher_type, names.data(), (int)names.size());
-    if (previous_type != remesher_type) {
-        reset();
-    }
+    if(ImGui::Combo("##remesher_strategy", &remesher_type, names.data(), (int)names.size())) reset();
+
     if (remesher_type == PRIORITY_GLOBAL) {
         ImGui::SameLine();
         ImGui::SetNextItemWidth(120.0f);
@@ -165,7 +164,7 @@ void AppViewer::draw_remesh_control() {
         names.clear();
         for (const auto& name : strategy_names) names.push_back(name.c_str());
         ImGui::SetNextItemWidth(180.0f);
-        ImGui::Combo("##strategy", &split_strategy, names.data(), (int)names.size());
+        if(ImGui::Combo("##strategy", &split_strategy, names.data(), (int)names.size())) reset();
     }
 
     if (ImGui::Button("Iterate")) {

@@ -49,6 +49,7 @@ add_executable(
     src/remesher/remeshers/remesher_prio_global.cpp
     src/remesher/evaluation_strategy.cpp
     src/remesher/strategies/split_max.cpp
+    src/remesher/strategies/split_avg.cpp
     src/remesher/loss.cpp
     src/io/logger.cpp
     src/io/paraview.cpp

@@ -21,7 +21,7 @@ namespace ba::ui {
         Mesh mesh;
         std::unique_ptr<Remesher> remesher;
         const std::vector<std::string> remesher_names = {"Standard", "Priority Local", "Priority Global"};
-        const std::vector<std::string> strategy_names = {"Split Sum (Default)", "Split Max"};
+        const std::vector<std::string> strategy_names = {"Split Sum", "Split Max", "Split Avg"};
         std::string path_to_data;
         std::vector<std::string> file_paths;
         std::vector<std::string> mesh_names;

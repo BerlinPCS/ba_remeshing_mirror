@@ -17,6 +17,7 @@
 
 #define SPLIT_SUM 0
 #define SPLIT_MAX 1
+#define SPLIT_AVG 2
 
 #define L_MAX 1.3333
 #define L_MIN 0.8
