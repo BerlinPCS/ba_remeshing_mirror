@@ -63,9 +63,9 @@ void RemesherPrioGlobal::single_iteration() {
 			}
 		} else if (cand.type == OpType::Collapse) {
 			Halfedge h; Point new_pos;
-			Vertex v_keep;
 			// to_vertex(h) is the vertex that is updated to the new position in collapse_edge()
-			if (get_collapse_info(mesh, cand.e, h, new_pos)) v_keep = mesh.to_vertex(h);
+			get_collapse_info(mesh, cand.e, h, new_pos);
+			Vertex v_keep = mesh.to_vertex(h);
 
 			if (collapse_edge(cand.e)) {
 				collapse_count++;

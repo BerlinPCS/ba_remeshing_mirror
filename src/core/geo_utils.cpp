@@ -67,16 +67,35 @@ double volume_ratio(const Mesh& mesh1, const Mesh& mesh2) {
     return vol2 / vol1;
 }
 
-bool get_collapse_info(const Mesh& mesh, Edge e, Halfedge& h, Point& new_pos) {
+void get_collapse_info(const Mesh& mesh, Edge e, Halfedge& h, Point& new_pos) {
     h = mesh.halfedge(e, 0);
-    if (mesh.is_boundary(mesh.from_vertex(h)) && !mesh.is_boundary(mesh.to_vertex(h))) {
-        h = mesh.halfedge(e, 1);
-    }
-    if (!mesh.is_collapse_ok(h)) return false;
-
+    if (mesh.is_boundary(mesh.from_vertex(h)) 
+        && !mesh.is_boundary(mesh.to_vertex(h))) h = mesh.halfedge(e, 1);
     Vertex v_from = mesh.from_vertex(h);
     Vertex v_to = mesh.to_vertex(h);
     new_pos = (mesh.is_boundary(v_to)) ? mesh.position(v_to) : 0.5 * (mesh.position(v_from) + mesh.position(v_to));
+}
+
+bool is_collapse_valid(const Mesh& mesh, Edge e, Halfedge& h, Point& new_pos, double target_length) {
+    if (mesh.is_deleted(e)) return false;
+    if (edge_length(mesh, e) >= target_length * L_MIN) return false;
+
+    // Collapse into a boundary vertex if possible, otherwise into midpoint of edge
+    get_collapse_info(mesh, e, h, new_pos);
+    if (!mesh.is_collapse_ok(h)) return false;
+    
+    // Check if the collapse would create a long edge, which would result in a loop
+    for(auto v : mesh.vertices(mesh.from_vertex(h))) {
+        if (v == mesh.to_vertex(h)) continue;
+        if (pmp::distance(new_pos, mesh.position(v)) > target_length * L_MAX) return false;
+    }
+    if (!mesh.is_boundary(mesh.to_vertex(h))) {
+        for(auto v : mesh.vertices(mesh.to_vertex(h))) {
+            if (v == mesh.from_vertex(h)) continue;
+            if (pmp::distance(new_pos, mesh.position(v)) > target_length * L_MAX) return false;
+        }
+    }
+
     return true;
 }
 
@@ -95,7 +114,7 @@ vec3 compute_smooth_step(const Mesh& mesh, Vertex v) {
     Normal normal = vertex_normal(mesh, v);
     vec3 tangential = dir - pmp::dot(dir, normal) * normal;
 
-    double scale = 1.0; // Implement gentle moving at some point?
+    double scale = 1.0; // TODO: Implement gentle moving at some point?
     return tangential * scale;
 }
 

@@ -9,52 +9,20 @@ bool Remesher::split_edge(Edge e) {
     if (mesh.is_deleted(e)) return false;
     if (edge_length(mesh, e) <= target_length * L_MAX) return false;
 
-    Vertex v0 = mesh.vertex(e, 0);
-    Vertex v1 = mesh.vertex(e, 1);
-
-    Point p0 = mesh.position(v0);
-    Point p1 = mesh.position(v1);
-
-    auto p_mid = 0.5 * (p0 + p1);
-    auto v_mid = mesh.add_vertex(p_mid);
-
-    mesh.split(e, v_mid);
+    Point p0 = mesh.position(mesh.vertex(e, 0));
+    Point p1 = mesh.position(mesh.vertex(e, 1));
+    Point p_mid = 0.5 * (p0 + p1);
+    
+    mesh.split(e, p_mid);
     return true;
 }
 
 // base collapsing operation
 bool Remesher::collapse_edge(Edge e) {
-    if (mesh.is_deleted(e)) return false;
-    if (edge_length(mesh, e) >= target_length * L_MIN) return false;
-
     Halfedge h; Point new_pos;
-    if (!get_collapse_info(mesh, e, h, new_pos)) return false;
+    if (!is_collapse_valid(mesh, e, h, new_pos, target_length)) return false;
 
-    Vertex v_from = mesh.from_vertex(h);
-    Vertex v_to = mesh.to_vertex(h);
-
-    // Check if the collapse would create a long edge, which would result in a loop
-    bool creates_long_edge = false;
-    for(auto v_n : mesh.vertices(v_from)) {
-        if (v_n == v_to) continue;
-        if (pmp::distance(new_pos, mesh.position(v_n)) > target_length * L_MAX) {
-            creates_long_edge = true;
-            break;
-        }
-    }
-
-    if(!creates_long_edge) {
-        for(auto v_n : mesh.vertices(v_to)) {
-            if (v_n == v_from) continue;
-            if (pmp::distance(new_pos, mesh.position(v_n)) > target_length * L_MAX) {
-                creates_long_edge = true;
-                break;
-            }
-        }
-    }
-
-    if (creates_long_edge) return false;
-    mesh.position(v_to) = new_pos;
+    mesh.position(mesh.to_vertex(h)) = new_pos;
     mesh.collapse(h);
     return true;
 }
@@ -74,25 +42,6 @@ bool Remesher::smooth_vertex(Vertex v) {
     if (pmp::norm(step) == 0.0) return false;
     mesh.position(v) += step;
     return true;
-}
-
-void Remesher::enqueue_candidate(OpQueue& pq, OpCandidate cand) {
-    if (!evaluator) return;
-	switch (cand.type) {
-		case OpType::Split:
-			cand.score = evaluator->split_score(mesh, cand.e);
-			break;
-		case OpType::Collapse:
-			cand.score = evaluator->collapse_score(mesh, cand.e);
-			break;
-		case OpType::Flip:
-			cand.score = evaluator->flip_score(mesh, cand.e);
-			break;
-		case OpType::Smooth:
-			cand.score = evaluator->smooth_score(mesh, cand.v);
-			break;
-	}
-	if (cand.score >= op_gain_threshold) pq.push(cand);
 }
 
 void Remesher::single_iteration() {
@@ -137,6 +86,27 @@ void Remesher::remesh(bool run_until_converged){
             prev_loss = metrics.total_edge_loss;
         }
     }
+}
+
+// ------------------------ Helper functions ------------------------
+
+void Remesher::enqueue_candidate(OpQueue& pq, OpCandidate cand) {
+    if (!evaluator) return;
+	switch (cand.type) {
+		case OpType::Split:
+			cand.score = evaluator->split_score(mesh, cand.e);
+			break;
+		case OpType::Collapse:
+			cand.score = evaluator->collapse_score(mesh, cand.e);
+			break;
+		case OpType::Flip:
+			cand.score = evaluator->flip_score(mesh, cand.e);
+			break;
+		case OpType::Smooth:
+			cand.score = evaluator->smooth_score(mesh, cand.v);
+			break;
+	}
+	if (cand.score >= op_gain_threshold) pq.push(cand);
 }
 
 } //namespace ba

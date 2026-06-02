@@ -56,10 +56,15 @@ double get_mesh_volume(const Mesh& mesh);
 double volume_ratio(const Mesh& mesh1, const Mesh& mesh2);
 
 /**
- * \brief Find collapse point and relevant halfedge
- * \return true if collapse is okay
+ * \brief Get the halfedge and new position for a collapse operation
+ *         Collapses into a boundary vertex if possible, otherwise into midpoint of edge
  */
-bool get_collapse_info(const Mesh& mesh, Edge e, Halfedge& collapse_h, Point& new_pos);
+void get_collapse_info(const Mesh& mesh, Edge e, Halfedge& h, Point& new_pos);
+
+/**
+ * \brief Checks if a collapse is valid and would not create a long edge
+ */
+bool is_collapse_valid(const Mesh& mesh, Edge e, Halfedge& h, Point& new_pos, double target_length);
 
 /**
  * \brief Computed the Vector which a vertex is moved by in the smoothing step

@@ -7,5 +7,5 @@
 #include "remesher/remeshers/remesher_standard.h"
 
 #include "remesher/evaluation_strategy.h"
-#include "remesher/strategies/standard_loss_evaluation.h" 
+#include "remesher/strategies/split_sum.h" 
 // IWYU pragma: end_exports

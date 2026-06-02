@@ -37,7 +37,6 @@ protected:
 
     void enqueue_candidate(OpQueue& pq, OpCandidate cand);
 
-
 public:
 
     //Getters
