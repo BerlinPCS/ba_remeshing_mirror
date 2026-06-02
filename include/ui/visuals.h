@@ -1,9 +1,6 @@
 #pragma once
 
 #include "core/types.h"
-#include "remesher/remesher_base.h"
-
-#include "polyscope/polyscope.h"
 
 namespace ba::ui {
 

@@ -1,14 +1,11 @@
 #pragma once
 #include <pmp/surface_mesh.h>
-#include <iostream>
 #include <functional>
-#include <chrono>
-#include <atomic>
 #include "core/types.h"
 #include "core/geo_utils.h"
-#include "io/paraview.h"
-#include "io/logger.h"
-#include "remesher/loss.h"
+
+#include "remesher/evaluation_strategy.h"
+#include <memory>
 
 namespace ba
 {
@@ -17,33 +14,17 @@ class Remesher {
 protected: 
     Mesh& mesh;
     const Mesh original_mesh;
-    const double l_max = 1.3333;
-    const double l_min = 0.8;
     double target_length;
     int iterations = 5;
     double op_gain_threshold = 1e-5;
     IterationMetrics metrics = IterationMetrics();
+    std::shared_ptr<EvaluationStrategy> evaluator;
     
     // Callback for progress updates in ui thread
     std::function<void(int, IterationMetrics)> progress_callback = nullptr;
 
     // Sets base mesh metrics (eg. vertex count)
     void set_metrics();
-
-    // Computed the Vector which a vertex is moved by in the smoothing step
-    vec3 compute_smooth_step(Vertex v) const;
-
-    // Find collapse point and relevant halfedge
-    bool get_collapse_info(Edge e, Halfedge& collapse_h, Point& new_pos);
-
-    // Score Split (loss before - after)
-    double split_score(Edge e);
-    // Score Collapse (loss before - after)
-	double collapse_score(Edge e);
-    // Score Flip (valence difference before - after)
-	int flip_score(Edge e);
-	// Score Smooth (loss before - after)
-	double smooth_score(Vertex v);
 
     // Base split for a single edge - returns if split occured or not
     bool split_edge(Edge e);
@@ -105,9 +86,11 @@ public:
     void remesh(bool run_until_converged);
     virtual ~Remesher() = default;
     
-    Remesher(Mesh& m) : mesh(m), original_mesh(m) { 
+    Remesher(Mesh& m, std::shared_ptr<EvaluationStrategy> evaluator) 
+        : mesh(m), original_mesh(m), evaluator(evaluator) { 
         target_length = avg_edge_length(m); 
         set_metrics();
+        evaluator->set_params(target_length, op_gain_threshold);
     }
 };
 

@@ -1,6 +1,5 @@
 #pragma once
 
-#include <vector>
 #include "core/types.h"
 
 namespace ba {
@@ -55,5 +54,17 @@ double get_mesh_volume(const Mesh& mesh);
  * \return The volume ratio as a double.
  */
 double volume_ratio(const Mesh& mesh1, const Mesh& mesh2);
+
+/**
+ * \brief Find collapse point and relevant halfedge
+ * \return true if collapse is okay
+ */
+bool get_collapse_info(const Mesh& mesh, Edge e, Halfedge& collapse_h, Point& new_pos);
+
+/**
+ * \brief Computed the Vector which a vertex is moved by in the smoothing step
+ * \return The update vector
+ */
+vec3 compute_smooth_step(const Mesh& mesh, Vertex v);
 
 } // namespace ba::core

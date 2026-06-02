@@ -1,12 +1,8 @@
 #pragma once
 
-#include <fstream>
-#include <filesystem>
-#include <cmath>
-#include <iostream>
-#include <iomanip>
-
-#include "core/types.h"
+#include <string>
+#include <vector>
+#include <pmp/surface_mesh.h>
 
 namespace ba::io {
 

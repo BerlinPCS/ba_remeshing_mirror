@@ -1,7 +1,5 @@
 #pragma once
 
-#include <queue>
-#include <vector>
 #include "remesher/remesher_base.h"
 
 namespace ba {
@@ -13,7 +11,7 @@ private:
     void enqueue_neighborhood(Vertex v, OpQueue& pq);
 
 public:
-	RemesherPrioGlobal(Mesh& m) : Remesher(m) {}
+	RemesherPrioGlobal(Mesh& m, std::shared_ptr<EvaluationStrategy> evaluator) : Remesher(m, evaluator) {}
 
 	void single_iteration() override;
 

@@ -1,25 +1,17 @@
 #pragma once
 
 #include <memory>
-#include <algorithm>
 #include <string>
-#include <sstream>
 #include <vector>
-#include <unordered_set>
 #include <atomic>
-#include <filesystem>
-#include <thread>
 
 #include "core/types.h"
 #include "remesher/remesher.h"
-#include "io/paraview.h"
 #include "io/logger.h"
-#include "remesher/loss.h"
-#include "ui/visuals.h"
+
 
 #include <pmp/io/io.h>
 #include "polyscope/polyscope.h"
-#include "portable-file-dialogs.h"
 
 namespace ba::ui {
 
@@ -28,8 +20,8 @@ namespace ba::ui {
         // Application State 
         Mesh mesh;
         std::unique_ptr<Remesher> remesher;
-        int remesher_type = BASE;
-        std::vector<std::string> strategies = {"standard", "priority_local", "priority_global"};
+        const std::vector<std::string> remesher_names = {"Standard", "Priority Local", "Priority Global"};
+        const std::vector<std::string> strategy_names = {"Split Sum (Default)", "Split Max"};
         std::string path_to_data;
         std::vector<std::string> file_paths;
         std::vector<std::string> mesh_names;
@@ -37,6 +29,8 @@ namespace ba::ui {
 
         // Remesher State
         int selected_mesh = 0;
+        int remesher_type = BASE;
+        int split_strategy = SPLIT_SUM;
         bool show_vertex_loss = false;
         bool run_until_converged = false;
         int iterations = 5;

@@ -1,10 +1,8 @@
 #pragma once
 
 #include <pmp/surface_mesh.h>
-
-#include "polyscope/polyscope.h"
-#include "polyscope/surface_mesh.h"
-
+#include <polyscope/polyscope.h>
+#include <polyscope/surface_mesh.h>
 #include <queue>
 
 #define ps polyscope
@@ -16,6 +14,12 @@
 #define BASE 0
 #define PRIORITY_LOCAL 1
 #define PRIORITY_GLOBAL 2
+
+#define SPLIT_SUM 0
+#define SPLIT_MAX 1
+
+#define L_MAX 1.3333
+#define L_MIN 0.8
 
 namespace ba {
 

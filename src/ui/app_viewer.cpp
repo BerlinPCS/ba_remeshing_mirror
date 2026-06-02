@@ -1,4 +1,13 @@
 #include "ui/app_viewer.h"
+#include "remesher/evaluation_strategy.h"
+#include "ui/visuals.h"
+#include "io/paraview.h"
+#include "remesher/loss.h"
+
+#include <sstream>
+#include <filesystem>
+#include <thread>
+#include <portable-file-dialogs.h>
 
 // Helper Function to Format File Names for ImGUI - not part of class
 std::string format_file_name(const std::string& name) {
@@ -54,12 +63,19 @@ void AppViewer::reset(const std::string& file_path){
 
     // Create the correct Remesher
     pmp::read(mesh, file_path.empty() ? file_paths[selected_mesh] : file_path);
+
+    std::shared_ptr<EvaluationStrategy> evaluator;
+    if (split_strategy == SPLIT_SUM) {
+        evaluator = std::make_shared<SplitSumEvaluation>();
+    } else if (split_strategy == SPLIT_MAX) {
+        //evaluator = std::make_shared<SplitMaxEvaluation>();
+    }
     if (remesher_type == PRIORITY_LOCAL) {
-        remesher = std::make_unique<ba::RemesherPrioLocal>(mesh);
+        remesher = std::make_unique<RemesherPrioLocal>(mesh, evaluator);
     } else if (remesher_type == PRIORITY_GLOBAL) {
-        remesher = std::make_unique<ba::RemesherPrioGlobal>(mesh);
+        remesher = std::make_unique<RemesherPrioGlobal>(mesh, evaluator);
     }  else {
-        remesher = std::make_unique<ba::RemesherStandard>(mesh);
+        remesher = std::make_unique<RemesherStandard>(mesh, evaluator);
     }
 
     // Draw Mesh
@@ -70,7 +86,7 @@ void AppViewer::reset(const std::string& file_path){
     // Log initial values
     current_file_name = std::filesystem::path(file_paths[selected_mesh]).stem().string();
     std::stringstream log_path;
-    log_path << OUT_LOG_DIR << "results_" << strategies[remesher_type] << "_" << current_file_name << ".csv";
+    log_path << OUT_LOG_DIR << "results_" << remesher_names[remesher_type] << "_" << current_file_name << ".csv";
     logger = std::make_unique<io::Logger>(log_path.str());
     log(remesher->get_metrics(), true);
 }
@@ -84,7 +100,7 @@ void AppViewer::log(IterationMetrics met, bool initial_log) {
             io::export_mesh_vtk(current_file_name, mesh, loss::get_vertex_losses(mesh, remesher->get_target_length()), current_total_iters);
         }
     }
-    current_total_iters++;
+    current_total_iters.fetch_add(1);
 }
 
 void AppViewer::draw_ui() {
@@ -133,7 +149,7 @@ void AppViewer::draw_remesh_control() {
     ImGui::SetNextItemWidth(180.0f);
     static std::vector<const char*> names;
     names.clear();
-    for (const auto& name : strategies) names.push_back(name.c_str());
+    for (const auto& name : remesher_names) names.push_back(name.c_str());
     ImGui::Combo("##remesher_strategy", &remesher_type, names.data(), (int)names.size());
     if (previous_type != remesher_type) {
         reset();
@@ -145,6 +161,13 @@ void AppViewer::draw_remesh_control() {
             static_cast<ba::RemesherPrioGlobal*>(remesher.get())->set_flip_frequency(flip_frequency);
         }
     }
+    if(remesher_type != BASE) {
+        names.clear();
+        for (const auto& name : strategy_names) names.push_back(name.c_str());
+        ImGui::SetNextItemWidth(180.0f);
+        ImGui::Combo("##strategy", &split_strategy, names.data(), (int)names.size());
+    }
+
     if (ImGui::Button("Iterate")) {
         remesher->timed_iteration();
         log(remesher->get_metrics());

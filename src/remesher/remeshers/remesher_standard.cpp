@@ -1,4 +1,4 @@
-#include "remesher/remesher_standard.h"
+#include "remesher/remeshers/remesher_standard.h"
 
 namespace ba {
 
@@ -6,7 +6,7 @@ int RemesherStandard::split_long_edges(){
     std::vector<Edge> edges_to_split;
     edges_to_split.reserve(mesh.n_edges() / 4); // Basic assumption that 25% need splitting, also for other operations
     for(auto e : mesh.edges()) {
-        if (edge_length(mesh, e) > target_length * l_max) {
+        if (edge_length(mesh, e) > target_length * L_MAX) {
             edges_to_split.push_back(e);
         }
     }
@@ -23,7 +23,7 @@ int RemesherStandard::collapse_short_edges(){
     std::vector<Edge> edges_to_collapse;
     edges_to_collapse.reserve(mesh.n_edges() / 4); // same assumption
     for(auto e : mesh.edges()) {
-        if (edge_length(mesh, e) < target_length * l_min) {
+        if (edge_length(mesh, e) < target_length * L_MIN) {
             edges_to_collapse.push_back(e);
         }
     }
@@ -56,7 +56,7 @@ int RemesherStandard::smooth_vertices(){
     auto v_new = mesh.add_vertex_property<vec3>("v:new", vec3(0,0,0));
 
     for(auto v : mesh.vertices()) {
-        v_new[v] = compute_smooth_step(v);
+        v_new[v] = compute_smooth_step(mesh, v);
     }
 
     for(auto v : mesh.vertices()){

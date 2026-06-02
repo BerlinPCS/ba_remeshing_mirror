@@ -1,7 +1,6 @@
 #include "ui/visuals.h"
 #include "core/types.h"
-#include "remesher/remesher.h"
-#include "polyscope/polyscope.h"
+#include "remesher/loss.h"
 
 namespace ba::ui {
 

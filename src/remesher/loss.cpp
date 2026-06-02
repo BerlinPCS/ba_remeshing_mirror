@@ -1,4 +1,5 @@
 #include "remesher/loss.h"
+#include "core/geo_utils.h"
 
 namespace ba::loss {
 
@@ -7,9 +8,9 @@ double get_edge_loss(const Mesh& mesh, Edge e, double target_length) {
 }
 
 double get_edge_loss_from_length(double length, double target_length) {
-    // Currently using basic log10 of ratio between length and target length
+    // Currently using basic log2 of ratio between length and target length
     double ratio = length / target_length;
-    double loss = std::log2(std::max(0.001, std::min(1000.0, ratio)));
+    double loss = std::log2(ratio);
     return loss * loss;
 }
 

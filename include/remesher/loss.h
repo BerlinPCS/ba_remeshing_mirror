@@ -1,11 +1,7 @@
 #pragma once
 
-#include <cmath>
-#include <algorithm>
 #include <vector>
-
 #include "core/types.h"
-#include "core/geo_utils.h"
 
 namespace ba::loss {
 

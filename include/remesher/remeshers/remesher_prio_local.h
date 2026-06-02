@@ -1,7 +1,5 @@
 #pragma once
 
-#include <queue>
-#include <vector>
 #include "remesher/remesher_base.h"
 
 namespace ba {
@@ -9,7 +7,7 @@ namespace ba {
 class RemesherPrioLocal : public Remesher {
 
 public:
-	RemesherPrioLocal(Mesh& m) : Remesher(m) {}
+	RemesherPrioLocal(Mesh& m, std::shared_ptr<EvaluationStrategy> evaluator) : Remesher(m, evaluator) {}
 
     //Base Operations
     int split_long_edges() override;

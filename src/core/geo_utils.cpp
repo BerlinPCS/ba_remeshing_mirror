@@ -67,4 +67,36 @@ double volume_ratio(const Mesh& mesh1, const Mesh& mesh2) {
     return vol2 / vol1;
 }
 
+bool get_collapse_info(const Mesh& mesh, Edge e, Halfedge& h, Point& new_pos) {
+    h = mesh.halfedge(e, 0);
+    if (mesh.is_boundary(mesh.from_vertex(h)) && !mesh.is_boundary(mesh.to_vertex(h))) {
+        h = mesh.halfedge(e, 1);
+    }
+    if (!mesh.is_collapse_ok(h)) return false;
+
+    Vertex v_from = mesh.from_vertex(h);
+    Vertex v_to = mesh.to_vertex(h);
+    new_pos = (mesh.is_boundary(v_to)) ? mesh.position(v_to) : 0.5 * (mesh.position(v_from) + mesh.position(v_to));
+    return true;
+}
+
+vec3 compute_smooth_step(const Mesh& mesh, Vertex v) {
+    if (mesh.is_deleted(v)) return vec3(0, 0, 0);
+    if (mesh.is_boundary(v)) return vec3(0, 0, 0);
+    if (mesh.valence(v) == 0) return vec3(0, 0, 0);
+
+    Point center(0, 0, 0);
+    for(auto vn : mesh.vertices(v)){
+        center += mesh.position(vn);
+    }
+    center /= mesh.valence(v);
+
+    vec3 dir = center - mesh.position(v);
+    Normal normal = vertex_normal(mesh, v);
+    vec3 tangential = dir - pmp::dot(dir, normal) * normal;
+
+    double scale = 1.0; // Implement gentle moving at some point?
+    return tangential * scale;
+}
+
 } // namespace ba

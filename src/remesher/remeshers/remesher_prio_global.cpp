@@ -1,4 +1,4 @@
-#include "remesher/remesher_prio_global.h"
+#include "remesher/remeshers/remesher_prio_global.h"
 
 namespace ba {
 
@@ -27,8 +27,6 @@ void RemesherPrioGlobal::single_iteration() {
 	}
 	for (auto v : mesh.vertices()) enqueue_candidate(pq, OpCandidate(OpType::Smooth, v));
 
-	size_t current_flip_edge_idx = 0;
-
 	while (!pq.empty()) {
 		OpCandidate cand = pq.top();
 		pq.pop();
@@ -37,11 +35,11 @@ void RemesherPrioGlobal::single_iteration() {
 		// Check if this is stale data that has changed (updated data should have been added to queue)
 		double current_score = -1.0;
 		if (cand.type == OpType::Split) {
-			current_score = split_score(cand.e);
+			current_score = evaluator->split_score(mesh, cand.e);
 		} else if (cand.type == OpType::Collapse) {
-			current_score = collapse_score(cand.e);
+			current_score = evaluator->collapse_score(mesh, cand.e);
 		} else if (cand.type == OpType::Smooth) {
-			current_score = smooth_score(cand.v);
+			current_score = evaluator->smooth_score(mesh, cand.v);
 		}
 		if (std::abs(current_score - cand.score) > 1e-5) {
 			continue;
@@ -67,7 +65,7 @@ void RemesherPrioGlobal::single_iteration() {
 			Halfedge h; Point new_pos;
 			Vertex v_keep;
 			// to_vertex(h) is the vertex that is updated to the new position in collapse_edge()
-			if (get_collapse_info(cand.e, h, new_pos)) v_keep = mesh.to_vertex(h);
+			if (get_collapse_info(mesh, cand.e, h, new_pos)) v_keep = mesh.to_vertex(h);
 
 			if (collapse_edge(cand.e)) {
 				collapse_count++;
@@ -81,12 +79,16 @@ void RemesherPrioGlobal::single_iteration() {
 		}
 
 		if (count % flip_frequency == 0) {
-			while (current_flip_edge_idx < mesh.edges_size()) {
-				Edge e_flip(current_flip_edge_idx++);
-				if (flip_edge(e_flip)) {
-					flip_count++;
-					break;
+			std::vector<Edge> edges_to_check;
+			edges_to_check.reserve(mesh.n_edges() / 4); //same assumption
+			for(auto e : mesh.edges()) {
+				if (mesh.is_flip_ok(e)) {
+					edges_to_check.push_back(e);
 				}
+			}
+
+			for(auto e : edges_to_check) {
+				if (flip_edge(e)) flip_count++;
 			}
 		}
 		count = split_count + collapse_count + flip_count + smooth_count;

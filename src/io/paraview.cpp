@@ -1,4 +1,6 @@
 #include "io/paraview.h"
+#include "core/types.h"
+#include <fstream>
 
 namespace ba::io {
 

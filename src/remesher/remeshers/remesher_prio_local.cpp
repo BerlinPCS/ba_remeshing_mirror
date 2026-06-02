@@ -1,4 +1,4 @@
-#include "remesher/remesher_prio_local.h"
+#include "remesher/remeshers/remesher_prio_local.h"
 
 namespace ba {
 
@@ -39,15 +39,15 @@ int RemesherPrioLocal::collapse_short_edges() {
 		pq.pop();
 		if (cand.score < 0) break;
 
-        // Check if this is invalid or stale data (updated data, if applicable, should have been added to queue)
-		double current_score = collapse_score(cand.e);
+        // Check if this is invalid or stale data (updated data, if applicable, should have been added
+		double current_score = evaluator->collapse_score(mesh, cand.e);
 		if (std::abs(current_score - cand.score) > 1e-5) continue;
 
 		Halfedge h; Point new_pos;
 		Vertex v_keep;
 
 		// to_vertex(h) is the vertex that is updated to the new position in collapse_edge()
-		if (get_collapse_info(cand.e, h, new_pos)) v_keep = mesh.to_vertex(h);
+		if (get_collapse_info(mesh, cand.e, h, new_pos)) v_keep = mesh.to_vertex(h);
 
 		if (collapse_edge(cand.e)) {
 			count++;
@@ -69,8 +69,8 @@ int RemesherPrioLocal::flip_edges() {
 		pq.pop();
 		if (cand.score < 0) break;
 
-        // Check if this is invalid or stale data (updated data, if applicable, should have been added to queue)
-		double current_score = flip_score(cand.e);
+        // Check if this is invalid or stale data (updated data, if applicable, should have been added
+		double current_score = evaluator->flip_score(mesh, cand.e);
 		if (std::abs(current_score - cand.score) > 1e-5) continue;
 
 		if (flip_edge(cand.e)) {

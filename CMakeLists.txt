@@ -1,12 +1,9 @@
-# CMakeLists.txt loosely based on CG2 Skeleton and https://github.com/nmwsharp/polyscope/blob/v1.3.0/examples/demo-app/CMakeLists.txt
-
 cmake_minimum_required(VERSION 3.14)
 project(isotropic_remesher LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-### Configure output locations
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
@@ -47,9 +44,10 @@ add_executable(
     src/ui/app_viewer.cpp
     src/ui/visuals.cpp
     src/remesher/remesher_base.cpp
-    src/remesher/remesher_standard.cpp
-    src/remesher/remesher_prio_local.cpp
-    src/remesher/remesher_prio_global.cpp
+    src/remesher/remeshers/remesher_standard.cpp
+    src/remesher/remeshers/remesher_prio_local.cpp
+    src/remesher/remeshers/remesher_prio_global.cpp
+    src/remesher/evaluation_strategy.cpp
     src/remesher/loss.cpp
     src/io/logger.cpp
     src/io/paraview.cpp
