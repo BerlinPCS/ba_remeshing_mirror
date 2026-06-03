@@ -10,7 +10,7 @@ Logger::Logger(const std::string& filepath) : file_path(filepath) {
 
     csv_file.open(filepath);
     if (csv_file.is_open()) {
-        csv_file << "iteration_num,time_ms,total_edge_loss,volume_ratio,vertex_count,edge_count,face_count,"
+        csv_file << "operations,time_ms,total_edge_loss,volume_ratio,vertex_count,edge_count,face_count,"
                  << "split_count,collapse_count,flip_count,smooth_count\n";
     } else {
         std::cerr << "Error: Could not open log file at " << filepath << std::endl;
@@ -23,9 +23,9 @@ Logger::~Logger() {
     }
 }
 
-void Logger::log_iteration(const IterationMetrics& metrics) {
+void Logger::log_iteration(const Metrics& metrics) {
     if (csv_file.is_open()) {
-        csv_file << metrics.iteration_num << ","
+        csv_file << metrics.operations << ","
                  << metrics.time_ms << ","
                  << metrics.total_edge_loss << ","
                  << metrics.volume_ratio << ","

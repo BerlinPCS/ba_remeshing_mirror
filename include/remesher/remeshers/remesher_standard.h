@@ -9,10 +9,10 @@ public:
 	RemesherStandard(Mesh& m, std::shared_ptr<EvaluationStrategy> evaluator) : Remesher(m, evaluator) {}
 
     //Base Operations
-    int split_long_edges() override;
-    int collapse_short_edges() override;
-    int flip_edges() override;
-    int smooth_vertices() override;
+    void split_long_edges() override;
+    void collapse_short_edges() override;
+    void flip_edges() override;
+    void smooth_vertices() override;
 
 };
 

@@ -2,7 +2,8 @@
 
 namespace ba {
 
-int RemesherStandard::split_long_edges(){
+void RemesherStandard::split_long_edges(){
+    int& count = metrics.split_count;
     std::vector<Edge> edges_to_split;
     edges_to_split.reserve(mesh.n_edges() / 4); // Basic assumption that 25% need splitting, also for other operations
     for(auto e : mesh.edges()) {
@@ -11,15 +12,16 @@ int RemesherStandard::split_long_edges(){
         }
     }
 
-    int count = 0;
     for(auto e : edges_to_split) {
-        if (split_edge(e)) count++;
+        if (split_edge(e)) {
+            count++;
+            report_progress(0);
+        }
     }
-    return count;
 }
 
-int RemesherStandard::collapse_short_edges(){
-    int count = 0;
+void RemesherStandard::collapse_short_edges(){
+    int& count = metrics.collapse_count;
     std::vector<Edge> edges_to_collapse;
     edges_to_collapse.reserve(mesh.n_edges() / 4); // same assumption
     for(auto e : mesh.edges()) {
@@ -29,13 +31,15 @@ int RemesherStandard::collapse_short_edges(){
     }
 
     for(auto e : edges_to_collapse) {
-        if (collapse_edge(e)) count++;
+        if (collapse_edge(e)) {
+            count++;
+            report_progress(0);
+        }
     }
-    return count;
 }
 
-int RemesherStandard::flip_edges(){
-    int count = 0;
+void RemesherStandard::flip_edges(){
+    int& count = metrics.flip_count;
     std::vector<Edge> edges_to_check;
     edges_to_check.reserve(mesh.n_edges() / 4); //same assumption
     for(auto e : mesh.edges()) {
@@ -45,14 +49,16 @@ int RemesherStandard::flip_edges(){
     }
 
     for(auto e : edges_to_check) {
-        if (flip_edge(e)) count++;
+        if (flip_edge(e)) {
+            count++;
+            report_progress(0);
+        }
     }
-    return count;
 }
 
 // Cant reuse the base operation, since all steps have to be calculated before updating positions
-int RemesherStandard::smooth_vertices(){
-    int count = 0;
+void RemesherStandard::smooth_vertices(){
+    int& count = metrics.smooth_count;
     auto v_new = mesh.add_vertex_property<vec3>("v:new", vec3(0,0,0));
 
     for(auto v : mesh.vertices()) {
@@ -63,10 +69,10 @@ int RemesherStandard::smooth_vertices(){
         if(pmp::norm(v_new[v]) > 0.0) {
             mesh.position(v) += v_new[v];
             count++;
+            report_progress(0);
         }
     }
     mesh.remove_vertex_property(v_new);
-    return count;
 }
 
 } //namespace ba

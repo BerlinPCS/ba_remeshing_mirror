@@ -2,77 +2,99 @@
 
 namespace ba {
 
-int RemesherPrioLocal::split_long_edges() {
+void RemesherPrioLocal::split_long_edges() {
 	OpQueue pq;
 	for (auto e : mesh.edges()) enqueue_candidate(pq, OpCandidate(OpType::Split, e));
 
-	int count = 0;
 	while (!pq.empty()) {
 		OpCandidate cand = pq.top();
 		pq.pop();
 		if (cand.score < 0) break;
 
+		// Check if this is invalid or stale data
+		if (mesh.is_deleted(cand.e) || cand.version != split_versions[cand.e]) continue;
+
 		Vertex v0 = mesh.vertex(cand.e, 0);
 		Vertex v1 = mesh.vertex(cand.e, 1);
 
 		if (split_edge(cand.e)) {
-			count++;
+			metrics.split_count++;
+			report_progress(pq.size());
 			// Enqueue the new edges - no need to update 1 ring neighborhood, since nothing is moved
 			// PMP keeps cand.e valid, one of the endpoints will have been updated to the new vertex
 			// Add all 4 edges of the new vertex, since they are all new as well
 			Vertex e_v0 = mesh.vertex(cand.e, 0);
 			Vertex e_v1 = mesh.vertex(cand.e, 1);
 			Vertex v_mid = (e_v0 != v0 && e_v0 != v1) ? e_v0 : e_v1;
-			if (v_mid.is_valid()) for (auto e : mesh.edges(v_mid)) enqueue_candidate(pq, OpCandidate(OpType::Split, e));
+			for (auto h : mesh.halfedges(v_mid)) {
+				Edge e = mesh.edge(h);
+				if (split_versions[e] != metrics.split_count) {
+					split_versions[e] = metrics.split_count;
+					enqueue_candidate(pq, OpCandidate(OpType::Split, e));
+				}
+				for (auto e_out : mesh.edges(mesh.to_vertex(h))) {
+					if (split_versions[e_out] != metrics.split_count) {
+						split_versions[e_out] = metrics.split_count;
+						enqueue_candidate(pq, OpCandidate(OpType::Split, e_out));
+					}
+				}
+			}
 		}
 	}
-	return count;
 }
 
-int RemesherPrioLocal::collapse_short_edges() {
+void RemesherPrioLocal::collapse_short_edges() {
 	OpQueue pq;
 	for (auto e : mesh.edges()) enqueue_candidate(pq, OpCandidate(OpType::Collapse, e));
 
-	int count = 0;
 	while (!pq.empty()) {
 		OpCandidate cand = pq.top();
 		pq.pop();
 		if (cand.score < 0) break;
 
-        // Check if this is invalid or stale data (updated data, if applicable, should have been added
-		double current_score = evaluator->collapse_score(mesh, cand.e);
-		if (std::abs(current_score - cand.score) > 1e-5) continue;
+        // Check if this is invalid or stale data
+		if (mesh.is_deleted(cand.e) || cand.version != collapse_versions[cand.e]) continue;
 
 		Halfedge h; Point new_pos;
 		get_collapse_info(mesh, cand.e, h, new_pos);
 		Vertex v_keep = mesh.to_vertex(h);
 
 		if (collapse_edge(cand.e)) {
-			count++;
-			for (auto e_out : mesh.edges(v_keep)) {
-				enqueue_candidate(pq, OpCandidate(OpType::Collapse, e_out));
+			metrics.collapse_count++;
+			report_progress(pq.size());
+			for (auto h : mesh.halfedges(v_keep)) {
+				Edge e = mesh.edge(h);
+				if (collapse_versions[e] != metrics.collapse_count) {
+					collapse_versions[e] = metrics.collapse_count;
+					enqueue_candidate(pq, OpCandidate(OpType::Collapse, e));
+				}
+				for (auto e_out : mesh.edges(mesh.to_vertex(h))) {
+					if (collapse_versions[e_out] != metrics.collapse_count) {
+						collapse_versions[e_out] = metrics.collapse_count;
+						enqueue_candidate(pq, OpCandidate(OpType::Collapse, e_out));
+					}
+				}
 			}
 		}
 	}
-	return count;
 }
 
-int RemesherPrioLocal::flip_edges() {
+void RemesherPrioLocal::flip_edges() {
 	OpQueue pq;
 	for (auto e : mesh.edges()) enqueue_candidate(pq, OpCandidate(OpType::Flip, e));
 
-	int count = 0;
 	while (!pq.empty()) {
 		OpCandidate cand = pq.top();
 		pq.pop();
 		if (cand.score < 0) break;
 
-        // Check if this is invalid or stale data (updated data, if applicable, should have been added
-		double current_score = evaluator->flip_score(mesh, cand.e);
-		if (std::abs(current_score - cand.score) > 1e-5) continue;
+        // Check if this is invalid or stale data
+		if (mesh.is_deleted(cand.e) || cand.version != flip_versions[cand.e]) continue;
 
 		if (flip_edge(cand.e)) {
-			count++;
+			metrics.flip_count++;
+			report_progress(pq.size());
+			/*
 			// All neighboring vertices will have had their valence change - enqueue all again
 			std::vector<Vertex> vertices(
 				{mesh.vertex(cand.e, 0), 
@@ -81,29 +103,67 @@ int RemesherPrioLocal::flip_edges() {
 					mesh.to_vertex(mesh.next_halfedge(mesh.halfedge(cand.e, 1)))
 				});
 			
+			enqueue_candidate(pq, OpCandidate(OpType::Flip, cand.e));
 			for (auto v : vertices) {
-				for (auto e : mesh.edges(v)) {
-					enqueue_candidate(pq, OpCandidate(OpType::Flip, e));
+				for (auto e : mesh.edges(v)) { 
+					if(e != cand.e) { // this also doesn't get rid of all duplicates
+						edge_versions[e] = count;
+						enqueue_candidate(pq, OpCandidate(OpType::Flip, e));
+					}
 				}
+			}
+			*/
+			std::vector<Vertex> vertices={
+				mesh.to_vertex(mesh.next_halfedge(mesh.halfedge(cand.e, 0))), 
+				mesh.to_vertex(mesh.next_halfedge(mesh.halfedge(cand.e, 1)))
+			};
+			for(auto v_neighbor : vertices) {
+				for (auto h : mesh.halfedges(v_neighbor)) {
+					Edge e = mesh.edge(h);
+					if (flip_versions[e] != metrics.flip_count) {
+						flip_versions[e] = metrics.flip_count;
+						enqueue_candidate(pq, OpCandidate(OpType::Flip, e));
+					}
+					for (auto e_out : mesh.edges(mesh.to_vertex(h))) {
+						if (flip_versions[e_out] != metrics.flip_count) {
+							flip_versions[e_out] = metrics.flip_count;
+							enqueue_candidate(pq, OpCandidate(OpType::Flip, e_out));
+						}
+					}
+				}	
 			}
 		}
 	}
-	return count;
 }
 
-int RemesherPrioLocal::smooth_vertices() {
+void RemesherPrioLocal::smooth_vertices() {
 	OpQueue pq;
 	for (auto v : mesh.vertices()) enqueue_candidate(pq, OpCandidate(OpType::Smooth, v));
 
-	int count = 0;
 	while (!pq.empty()) {
 		OpCandidate cand = pq.top();
 		pq.pop();
 		if (cand.score < 0) break;
 
-		if (smooth_vertex(cand.v)) count++;
+		// Check if this is invalid or stale data
+		if (mesh.is_deleted(cand.v) || cand.version != smooth_versions[cand.v]) continue;
+
+		if (smooth_vertex(cand.v)) {
+			metrics.smooth_count++;
+			report_progress(pq.size());
+			for (auto v_neighbor : mesh.vertices(cand.v)) {
+				smooth_versions[v_neighbor] = metrics.smooth_count;
+				enqueue_candidate(pq, OpCandidate(OpType::Smooth, v_neighbor));
+			}
+		}
 	}
-	return count;
+}
+
+void RemesherPrioLocal::remesh() {
+    single_iteration();
+    if (progress_callback) {
+        progress_callback(0, metrics, true);
+    }
 }
 
 } // namespace ba

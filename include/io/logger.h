@@ -28,7 +28,7 @@ public:
      * \brief Writes a single row of metrics to the CSV file.
      * \param metrics The data gathered from the current iteration.
      */
-    void log_iteration(const IterationMetrics& metrics);
+    void log_iteration(const Metrics& metrics);
 };
 
 } // namespace ba

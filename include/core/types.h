@@ -27,7 +27,11 @@ namespace ba {
 // PMP types
 using Mesh = pmp::SurfaceMesh;
 using Vertex = pmp::Vertex;
+template <typename T>
+using VertexProperty = pmp::VertexProperty<T>;
 using Edge = pmp::Edge;
+template <typename T>
+using EdgeProperty = pmp::EdgeProperty<T>;
 using Face = pmp::Face;
 using Halfedge = pmp::Halfedge;
 using Point = pmp::Point;
@@ -39,8 +43,8 @@ using vec2 = pmp::vec2;
 /**
  * \brief A struct to hold metrics for a single iteration.
  */
-struct IterationMetrics {
-    int iteration_num = 0;
+struct Metrics {
+    int operations = 0;
     double time_ms = -1;
     double total_edge_loss = -1;
     double volume_ratio = 1;
@@ -63,11 +67,13 @@ class OpCandidate {
 public:
     OpCandidate(OpType t, Vertex v) : type(t), v(v) { validate(); }
     OpCandidate(OpType t, Edge e) : type(t), e(e) { validate(); }
+    OpCandidate() = default;
 
     OpType type;
     Edge e = Edge();
     Vertex v = Vertex();
     double score;
+    int version = 0;
 private:
     void validate() {
         switch (type) {

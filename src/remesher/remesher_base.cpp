@@ -1,6 +1,6 @@
 #include "remesher/remesher_base.h"
+#include "core/types.h"
 #include "remesher/loss.h"
-#include <chrono>
 
 namespace ba {
 
@@ -45,10 +45,12 @@ bool Remesher::smooth_vertex(Vertex v) {
 }
 
 void Remesher::single_iteration() {
-    metrics.split_count = split_long_edges();
-	metrics.collapse_count = collapse_short_edges();
-	metrics.flip_count = flip_edges();
-	metrics.smooth_count = smooth_vertices();
+    split_long_edges();
+	collapse_short_edges();
+	flip_edges();
+	smooth_vertices();
+    set_metrics();
+    mesh.garbage_collection();
 }
 
 void Remesher::set_metrics() {
@@ -59,33 +61,9 @@ void Remesher::set_metrics() {
     metrics.face_count = mesh.n_faces();
 }
 
-void Remesher::timed_iteration(){
-    auto start = std::chrono::high_resolution_clock::now();
-    single_iteration();
-    auto end = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double> elapsed = end - start;
-    metrics.time_ms = elapsed.count() * 1000;
-    set_metrics();
-    mesh.garbage_collection();
-}
-
-bool Remesher::converged(double prev_loss) {
-    return prev_loss >= 0.0 && std::abs(prev_loss - metrics.total_edge_loss) < op_gain_threshold;
-}
-
-void Remesher::remesh(bool run_until_converged){
-    int max_iters = (run_until_converged ? 100 : iterations);
-    double prev_loss = -1.0;
-    for(int i = 0; i < max_iters; i++) {
-        timed_iteration();
-        if (progress_callback) progress_callback(i + 1, metrics);
-        if (run_until_converged) {
-            if (converged(prev_loss)) {
-                break; // Loss stabilized, exit early
-            }
-            prev_loss = metrics.total_edge_loss;
-        }
-    }
+void Remesher::remesh() {
+    for(int i = 0; i < iterations; i++) single_iteration();
+    if (progress_callback) progress_callback(metrics.operations, metrics, true);
 }
 
 // ------------------------ Helper functions ------------------------
@@ -95,15 +73,19 @@ void Remesher::enqueue_candidate(OpQueue& pq, OpCandidate cand) {
 	switch (cand.type) {
 		case OpType::Split:
 			cand.score = evaluator->split_score(mesh, cand.e);
+			cand.version = split_versions[cand.e];
 			break;
 		case OpType::Collapse:
 			cand.score = evaluator->collapse_score(mesh, cand.e);
+			cand.version = collapse_versions[cand.e];
 			break;
 		case OpType::Flip:
 			cand.score = evaluator->flip_score(mesh, cand.e);
+			cand.version = flip_versions[cand.e];
 			break;
 		case OpType::Smooth:
 			cand.score = evaluator->smooth_score(mesh, cand.v);
+			cand.version = smooth_versions[cand.v];
 			break;
 	}
 	if (cand.score >= op_gain_threshold) pq.push(cand);

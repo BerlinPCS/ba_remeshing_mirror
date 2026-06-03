@@ -32,26 +32,28 @@ namespace ba::ui {
         int remesher_type = BASE;
         int split_strategy = SPLIT_SUM;
         bool show_vertex_loss = false;
-        bool run_until_converged = false;
         int iterations = 5;
         int flip_frequency = 5;
+        bool separate_flip_queue = true;
+        float op_gain_threshold = 1e-5f;
 
-        // Logging
+        // Logging & Progress
         bool logging = true, vtk_export = false;
+        int logs = 0;
         std::unique_ptr<io::Logger> logger;
-        std::atomic<int> current_total_iters{0};
         std::atomic<bool> is_remeshing{false};
-        std::atomic<int> current_progress_iter{0};
-        std::atomic<int> total_progress_iters{100};
+        std::atomic<int> current_progress_ops{0};
+        std::atomic<int> current_queue_size{0};
         std::atomic<double> current_progress_loss{0.0};
-        IterationMetrics metrics;
+        int log_frequency = 0;
+        Metrics metrics;
 
         /**
          * Reset UI state and load a mesh 
          */
         void reset(const std::string& filepath = "");
 
-        void log(IterationMetrics metrics, bool initial_log = false);
+        void log(Metrics metrics, bool initial_log = false);
 
         /**
          * \brief Callback function for the ImGui UI. 
@@ -59,6 +61,7 @@ namespace ba::ui {
         void draw_ui();
         void draw_mesh_control();
         void draw_remesh_control();
+        void draw_prio_control();
         void draw_visualization_control();
         void condition_updates(); // update output based on current ui state
 
