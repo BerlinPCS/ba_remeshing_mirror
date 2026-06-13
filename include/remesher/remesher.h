@@ -7,7 +7,4 @@
 #include "remesher/remeshers/remesher_standard.h"
 
 #include "remesher/evaluation_strategy.h"
-#include "remesher/strategies/split_sum.h" 
-#include "remesher/strategies/split_max.h" 
-#include "remesher/strategies/split_avg.h" 
 // IWYU pragma: end_exports

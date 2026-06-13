@@ -6,7 +6,7 @@ namespace ba {
 
 class RemesherStandard : public Remesher {
 public:
-	RemesherStandard(Mesh& m, std::shared_ptr<EvaluationStrategy> evaluator) : Remesher(m, evaluator) {}
+	RemesherStandard(Mesh& m, RemesherSettings& r_ctx, SyncState<ProgressState>& p_ctx) : Remesher(m, r_ctx, p_ctx) {}
 
     //Base Operations
     void split_long_edges() override;

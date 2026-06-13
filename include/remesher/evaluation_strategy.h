@@ -13,11 +13,10 @@ public:
     virtual int flip_score(const Mesh& mesh, Edge e);
     virtual double smooth_score(const Mesh& mesh, Vertex v);
 
-    void set_params(double tl, double ogt) { target_length = tl; op_gain_threshold = ogt; }
+    EvaluationStrategy(RemesherSettings& ctx) : ctx(ctx) {}
 
 protected:
-    double target_length;
-    double op_gain_threshold;
+    RemesherSettings& ctx;
 };
 
 } // namespace ba

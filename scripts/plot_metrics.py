@@ -1,14 +1,16 @@
+import argparse
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 from matplotlib.ticker import FuncFormatter
 from pathlib import Path
-
+from collections import defaultdict
 sns.set_theme(style="whitegrid", context="paper", font_scale=1.2)
 
 def load_and_label_data(filepath, strategy_name):
     """Loads a CSV and tags it with the strategy name so we can group the lines."""
     df = pd.read_csv(filepath)
+    df['total_edge_loss'] /= df['edge_count']
     # Strip whitespace from column names
     df.columns = df.columns.str.strip() 
     df['Strategy'] = strategy_name
@@ -69,11 +71,59 @@ def generate_thesis_plots(csv_files, output_filename="../out/plots/remeshing_res
     plt.savefig(output_filename, format='svg', bbox_inches='tight')
     print(f"Successfully generated high-resolution plot: {output_filename}")
 
+def parse_filename(filepath):
+    stem = filepath.stem
+    if '_' in stem:
+        mesh_name, strategy_raw = stem.split('_', 1)
+        strategy_name = strategy_raw.replace('_', ' ').title()
+        return mesh_name, strategy_name
+    else:
+        return stem, stem
+
+def get_log_files(logs_dir):
+    valid_files = []
+    for filepath in Path(logs_dir).glob("*.csv"):
+        try:
+            with open(filepath, 'r') as f:
+                lines = 0
+                for _ in f:
+                    lines += 1
+                    if lines > 2:
+                        valid_files.append(filepath)
+                        break
+        except Exception as e:
+            print(f"Could not read {filepath}: {e}")
+    return valid_files
+
 if __name__ == "__main__":
-    files_to_plot = {
-        "../out/logs/results_Standard_stanford-bunny.csv": "Standard",
-        "../out/logs/results_Priority Local_stanford-bunny.csv": "Priority Local",
-        "../out/logs/results_Priority Global_stanford-bunny.csv": "Priority Global"
-    }
+    parser = argparse.ArgumentParser(description='Plot remeshing metrics.')
+    parser.add_argument('--mesh', type=str, help='Optional mesh name to plot. If not provided, plots all meshes found in logs.')
+    args = parser.parse_args()
+
+    logs_dir = Path("../out/logs")
+    if not logs_dir.exists():
+        print(f"Logs directory {logs_dir} does not exist.")
+        exit(1)
+
+    valid_files = get_log_files(logs_dir)
     
-    generate_thesis_plots(files_to_plot)
+    if not valid_files:
+        print(f"No valid log files (with >2 lines) found in {logs_dir}.")
+        exit(0)
+
+    mesh_files = defaultdict(dict)
+    for filepath in valid_files:
+        mesh_name, strategy_name = parse_filename(filepath)
+        mesh_files[mesh_name][str(filepath)] = strategy_name
+
+    if args.mesh:
+        if args.mesh in mesh_files:
+            print(f"Plotting for mesh: {args.mesh}")
+            generate_thesis_plots(mesh_files[args.mesh], output_filename=f"../out/plots/{args.mesh}_results.svg")
+        else:
+            print(f"No valid logs found for mesh: {args.mesh}")
+            print(f"Available meshes: {', '.join(mesh_files.keys())}")
+    else:
+        for mesh_name, files_to_plot in mesh_files.items():
+            print(f"Plotting for mesh: {mesh_name}")
+            generate_thesis_plots(files_to_plot, output_filename=f"../out/plots/{mesh_name}_results.svg")

@@ -7,7 +7,7 @@ namespace ba {
 // Base splitting operation
 bool Remesher::split_edge(Edge e) {
     if (mesh.is_deleted(e)) return false;
-    if (edge_length(mesh, e) <= target_length * L_MAX) return false;
+    if (edge_length(mesh, e) <= r_ctx.target_length * L_MAX) return false;
 
     Point p0 = mesh.position(mesh.vertex(e, 0));
     Point p1 = mesh.position(mesh.vertex(e, 1));
@@ -20,7 +20,7 @@ bool Remesher::split_edge(Edge e) {
 // base collapsing operation
 bool Remesher::collapse_edge(Edge e) {
     Halfedge h; Point new_pos;
-    if (!is_collapse_valid(mesh, e, h, new_pos, target_length)) return false;
+    if (!is_collapse_valid(mesh, e, h, new_pos, r_ctx.target_length)) return false;
 
     mesh.position(mesh.to_vertex(h)) = new_pos;
     mesh.collapse(h);
@@ -54,16 +54,23 @@ void Remesher::single_iteration() {
 }
 
 void Remesher::set_metrics() {
-    metrics.total_edge_loss = loss::calc_total_edge_loss(mesh, target_length);
-    metrics.volume_ratio = volume_ratio(original_mesh, mesh);
-    metrics.vertex_count = mesh.n_vertices();
-    metrics.edge_count = mesh.n_edges();
-    metrics.face_count = mesh.n_faces();
+    // Pre-compute outside the lock to minimize hold time
+    double edge_loss = loss::calc_total_edge_loss(mesh, r_ctx.target_length);
+    double vol_ratio = volume_ratio(original_mesh, mesh);
+    int verts = mesh.n_vertices(), edges = mesh.n_edges(), faces = mesh.n_faces();
+
+    p_ctx.update([&](ProgressState& state) {
+        state.metrics.total_edge_loss = edge_loss;
+        state.metrics.volume_ratio = vol_ratio;
+        state.metrics.vertex_count = verts;
+        state.metrics.edge_count = edges;
+        state.metrics.face_count = faces;
+    });
 }
 
 void Remesher::remesh() {
-    for(int i = 0; i < iterations; i++) single_iteration();
-    if (progress_callback) progress_callback(metrics.operations, metrics, true);
+    for(int i = 0; i < r_ctx.iterations; i++) single_iteration();
+    progress_callback(true);
 }
 
 // ------------------------ Helper functions ------------------------
@@ -88,7 +95,7 @@ void Remesher::enqueue_candidate(OpQueue& pq, OpCandidate cand) {
 			cand.version = smooth_versions[cand.v];
 			break;
 	}
-	if (cand.score >= op_gain_threshold) pq.push(cand);
+	if (cand.score >= r_ctx.op_gain_threshold) pq.push(cand);
 }
 
 } //namespace ba

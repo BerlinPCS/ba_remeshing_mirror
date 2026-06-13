@@ -48,8 +48,6 @@ add_executable(
     src/remesher/remeshers/remesher_prio_local.cpp
     src/remesher/remeshers/remesher_prio_global.cpp
     src/remesher/evaluation_strategy.cpp
-    src/remesher/strategies/split_max.cpp
-    src/remesher/strategies/split_avg.cpp
     src/remesher/loss.cpp
     src/io/logger.cpp
     src/io/paraview.cpp
@@ -58,4 +56,4 @@ add_executable(
 target_include_directories(remesher PRIVATE "${polyscope_SOURCE_DIR}/deps/args")
 target_include_directories(remesher PRIVATE "${polyscope_SOURCE_DIR}/deps/json/include")
 
-target_link_libraries(remesher PRIVATE pmp polyscope portable_file_dialogs)
+target_link_libraries(remesher PRIVATE pmp polyscope portable_file_dialogs atomic)

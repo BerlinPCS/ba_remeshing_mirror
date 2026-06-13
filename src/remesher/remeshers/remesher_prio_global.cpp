@@ -61,13 +61,8 @@ void RemesherPrioGlobal::enqueue_affected_region(OpQueue& pq, OpQueue& flip_pq, 
 }
 
 void RemesherPrioGlobal::single_iteration() {
-	int& split_count = metrics.split_count;
-	int& collapse_count = metrics.collapse_count;
-	int& flip_count = metrics.flip_count;
-	int& smooth_count = metrics.smooth_count;
-
 	OpQueue pq, real_flip_pq;
-	OpQueue& flip_pq = separate_flip_queue ? real_flip_pq : pq;
+	OpQueue& flip_pq = r_ctx.separate_flip_queue ? real_flip_pq : pq;
 	for (auto e : mesh.edges()) {
 		enqueue_length_ops(pq, e);
 		enqueue_flip(flip_pq, e);
@@ -76,7 +71,8 @@ void RemesherPrioGlobal::single_iteration() {
 
 	while (!pq.empty() || !flip_pq.empty()) {
 		OpCandidate cand;
-		if (!flip_pq.empty() && (pq.empty() || metrics.operations % flip_frequency == 0)) {
+		int ops = p_ctx.load().metrics.operations;
+		if (!flip_pq.empty() && (pq.empty() || ops % r_ctx.flip_frequency == 0)) {
 			cand = flip_pq.top();
 			flip_pq.pop();
 		} else {
@@ -85,6 +81,8 @@ void RemesherPrioGlobal::single_iteration() {
 		}
 		if (cand.score < 0) break;
 
+		int queue_size = pq.size() + flip_pq.size();
+
 		if (cand.type == OpType::Split) {
 			if (mesh.is_deleted(cand.e) || cand.version != split_versions[cand.e]) continue;
 			
@@ -92,8 +90,7 @@ void RemesherPrioGlobal::single_iteration() {
 			Vertex v1 = mesh.vertex(cand.e, 1);
 
 			if (split_edge(cand.e)) {
-				split_count++;
-				report_progress(pq.size() + flip_pq.size());
+				report_progress(OpType::Split, queue_size);
 				Vertex e_v0 = mesh.vertex(cand.e, 0);
 				Vertex e_v1 = mesh.vertex(cand.e, 1);
 				Vertex v_mid = (e_v0 != v0 && e_v0 != v1) ? e_v0 : e_v1;
@@ -108,37 +105,29 @@ void RemesherPrioGlobal::single_iteration() {
 			Vertex v_keep = mesh.to_vertex(h);
 
 			if (collapse_edge(cand.e)) {
-				collapse_count++;
-				report_progress(pq.size() + flip_pq.size());
+				report_progress(OpType::Collapse, queue_size);
 				enqueue_affected_region(pq, flip_pq, {v_keep});
 			}
 		} else if (cand.type == OpType::Smooth) {
 			if (mesh.is_deleted(cand.v) || cand.version != smooth_versions[cand.v]) continue;
 			if (smooth_vertex(cand.v)) {
-				smooth_count++;
-				report_progress(pq.size() + flip_pq.size());
+				report_progress(OpType::Smooth, queue_size);
 				enqueue_affected_region(pq, flip_pq, {cand.v});
 			}
 		} else if (cand.type == OpType::Flip) {
 			if (mesh.is_deleted(cand.e) || cand.version != flip_versions[cand.e]) continue;
 			if (flip_edge(cand.e)) {
-				flip_count++;
-				report_progress(pq.size() + flip_pq.size());
+				report_progress(OpType::Flip, queue_size);
 				enqueue_affected_region(pq, flip_pq, {mesh.vertex(cand.e, 0), mesh.vertex(cand.e, 1)});
 			}
 		}
-
-		metrics.operations = split_count + collapse_count + flip_count + smooth_count;
 	}
+	mesh.garbage_collection();
 }
 
 void RemesherPrioGlobal::remesh() {
 	single_iteration();
-	mesh.garbage_collection();
-	if (progress_callback) {
-        set_metrics();
-        progress_callback(metrics.operations, metrics, true);
-    }
+	progress_callback(true);
 }
 
 } // namespace ba

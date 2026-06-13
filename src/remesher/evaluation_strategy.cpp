@@ -7,7 +7,7 @@ namespace ba {
 
 double EvaluationStrategy::split_score(const Mesh& mesh, Edge e) {
     if (mesh.is_deleted(e)) return -1.0;
-    if (edge_length(mesh, e) <= target_length * L_MAX) return -1.0;
+    if (edge_length(mesh, e) <= ctx.target_length * L_MAX) return -1.0;
 
     // The new vertex v_mid would be created at the center of the edge e
 	Vertex v0 = mesh.vertex(e, 0);
@@ -22,27 +22,40 @@ double EvaluationStrategy::split_score(const Mesh& mesh, Edge e) {
 
     double length = edge_length(mesh, e);
     // Loss of the single edge within the two trianges
-	double before = loss::get_edge_loss_from_length(length, target_length);
-    // Loss of all 4 edges within the two triangles
-	double after = 2.0 * loss::get_edge_loss_from_length(0.5 * length, target_length);
-    if (!mesh.is_boundary(h0)) after += loss::get_edge_loss_from_length(pmp::distance(p2, p_mid), target_length);
-    if (!mesh.is_boundary(h1)) after += loss::get_edge_loss_from_length(pmp::distance(p3, p_mid), target_length);
+	double before = loss::get_edge_loss_from_length(length, ctx.target_length);
+    double after = 0.0;
+    if(ctx.split == SplitMode::SUM || ctx.split == SplitMode::AVG) {
+        // Loss of all 4 edges within the two triangles
+        after = 2.0 * loss::get_edge_loss_from_length(0.5 * length, ctx.target_length);
+        if (!mesh.is_boundary(h0)) after += loss::get_edge_loss_from_length(pmp::distance(p2, p_mid), ctx.target_length);
+        if (!mesh.is_boundary(h1)) after += loss::get_edge_loss_from_length(pmp::distance(p3, p_mid), ctx.target_length);
+        if (ctx.split == SplitMode::AVG) {
+            int edges_considered = 2 + (mesh.is_boundary(h0) ? 0 : 1) + (mesh.is_boundary(h1) ? 0 : 1);
+            after /= edges_considered;
+        }
+    }
+    else if(ctx.split == SplitMode::MAX) {
+        after = loss::get_edge_loss_from_length(0.5 * length, ctx.target_length);
+        if (!mesh.is_boundary(h0)) after = std::max(after, loss::get_edge_loss_from_length(pmp::distance(p2, p_mid), ctx.target_length));
+        if (!mesh.is_boundary(h1)) after = std::max(after, loss::get_edge_loss_from_length(pmp::distance(p3, p_mid), ctx.target_length));
+    }
+
     
     double score = before - after;
-    return (score >= op_gain_threshold) ? score : -1.0;
+    return (score >= ctx.op_gain_threshold) ? score : -1.0;
 }
 
 double EvaluationStrategy::collapse_score(const Mesh& mesh, Edge e) {
     Halfedge h;
     Point new_pos;
-    if (!is_collapse_valid(mesh, e, h, new_pos, target_length)) return -1.0;
+    if (!is_collapse_valid(mesh, e, h, new_pos, ctx.target_length)) return -1.0;
 
     Vertex v_from = mesh.from_vertex(h);
     Vertex v_to = mesh.to_vertex(h);
     Point p_from = mesh.position(v_from);
     Point p_to = mesh.position(v_to);
 
-    double before = loss::get_edge_loss(mesh, e, target_length);
+    double before = loss::get_edge_loss(mesh, e, ctx.target_length);
     double after = 0.0;
 
     // We have to evaluate all edges that are one step away, since they would be affected by the operation
@@ -51,22 +64,22 @@ double EvaluationStrategy::collapse_score(const Mesh& mesh, Edge e) {
     for (auto v : mesh.vertices(v_from)) {
         if (v == v_to) continue;
         neighbors.push_back(v);
-        before += loss::get_edge_loss_from_length(pmp::distance(p_from, mesh.position(v)), target_length);
+        before += loss::get_edge_loss_from_length(pmp::distance(p_from, mesh.position(v)), ctx.target_length);
     }
     // Evaluate edges around v_to
     for (auto v : mesh.vertices(v_to)) {
         if (v == v_from) continue;
-        before += loss::get_edge_loss_from_length(pmp::distance(p_to, mesh.position(v)), target_length);
+        before += loss::get_edge_loss_from_length(pmp::distance(p_to, mesh.position(v)), ctx.target_length);
         if (std::find(neighbors.begin(), neighbors.end(), v) == neighbors.end()) {
             neighbors.push_back(v);
         }
     }
     // Evaluate the new edges connecting to the merged vertex
     for (auto v : neighbors) {
-        after += loss::get_edge_loss_from_length(pmp::distance(new_pos, mesh.position(v)), target_length);
+        after += loss::get_edge_loss_from_length(pmp::distance(new_pos, mesh.position(v)), ctx.target_length);
     }
     double score = before - after;
-    return (score >= op_gain_threshold) ? score : -1.0;
+    return (score >= ctx.op_gain_threshold) ? score : -1.0;
 }
 
 // Ignore for Global Prio Queue - unable to compare since this is valence loss
@@ -112,16 +125,16 @@ double EvaluationStrategy::smooth_score(const Mesh& mesh, Vertex v) {
     if (pmp::norm(step) == 0.0) return -1.0;
 	Point p_new = mesh.position(v) + step;
 
-    double before = loss::single_vertex_loss(mesh, target_length, v);
+    double before = loss::single_vertex_loss(mesh, ctx.target_length, v);
     double after = 0.0;
     for (auto v_n : mesh.vertices(v)) {
         Point p_n = mesh.position(v_n);
 
-        after += loss::get_edge_loss_from_length(pmp::distance(p_new, p_n), target_length);
+        after += loss::get_edge_loss_from_length(pmp::distance(p_new, p_n), ctx.target_length);
     }
     after /= mesh.valence(v);
 	double score = before - after;
-    return (score >= op_gain_threshold) ? score : -1.0;
+    return (score >= ctx.op_gain_threshold) ? score : -1.0;
 }
 
 } // namespace ba

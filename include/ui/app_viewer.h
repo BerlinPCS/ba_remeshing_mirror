@@ -3,7 +3,6 @@
 #include <memory>
 #include <string>
 #include <vector>
-#include <atomic>
 
 #include "core/types.h"
 #include "remesher/remesher.h"
@@ -21,66 +20,38 @@ namespace ba::ui {
         Mesh mesh;
         std::unique_ptr<Remesher> remesher;
         const std::vector<std::string> remesher_names = {"Standard", "Priority Local", "Priority Global"};
-        const std::vector<std::string> strategy_names = {"Split Sum", "Split Max", "Split Avg"};
-        std::string path_to_data;
+        const std::vector<std::string> split_mode_names = {"Sum", "Max", "Avg"};
+        const std::vector<std::string> collapse_mode_names = {"Loss"};
+        const std::vector<std::string> flip_mode_names = {"Valence", "Edge Length"};
         std::vector<std::string> file_paths;
         std::vector<std::string> mesh_names;
         std::string current_file_name;
-
-        // Remesher State
         int selected_mesh = 0;
-        int remesher_type = BASE;
-        int split_strategy = SPLIT_SUM;
-        bool show_vertex_loss = false;
-        int iterations = 5;
-        int flip_frequency = 5;
-        bool separate_flip_queue = true;
-        float op_gain_threshold = 1e-5f;
+
+        // Remesher Settings
+        RemesherSettings r_ctx;
+        RemesherType r_type = RemesherType::BASE;
 
         // Logging & Progress
-        bool logging = true, vtk_export = false;
-        int logs = 0;
+        LoggingState l_ctx;
         std::unique_ptr<io::Logger> logger;
-        std::atomic<bool> is_remeshing{false};
-        std::atomic<int> current_progress_ops{0};
-        std::atomic<int> current_queue_size{0};
-        std::atomic<double> current_progress_loss{0.0};
-        int log_frequency = 0;
-        Metrics metrics;
+        SyncState<ProgressState> p_ctx;
+        void log(bool initial_log = false);
 
-        /**
-         * Reset UI state and load a mesh 
-         */
+        // Reset Polyscope State
         void reset(const std::string& filepath = "");
 
-        void log(Metrics metrics, bool initial_log = false);
-
-        /**
-         * \brief Callback function for the ImGui UI. 
-         */
+        // UI Rendering
         void draw_ui();
         void draw_mesh_control();
         void draw_remesh_control();
         void draw_prio_control();
         void draw_visualization_control();
-        void condition_updates(); // update output based on current ui state
+        void condition_updates();
 
 
     public:
-        /**
-         * \brief Constructor for UI
-         * \param path_to_data Path to the directory containing .off files. Defaults to "./data"
-         */
-        AppViewer(std::string path_to_data = DATA_DIR) : path_to_data(path_to_data) {}
-
-        /**
-         * \brief Initializes Polyscope, registers the point cloud, and sets the callback
-         */
         void init();
-
-        /**
-         * \brief Starts main loop
-         */
         void run() { polyscope::show(); };
     };
 
