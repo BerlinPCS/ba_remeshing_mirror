@@ -29,11 +29,9 @@ bool Remesher::collapse_edge(Edge e) {
 
 // Base flipping operation
 bool Remesher::flip_edge(Edge e) {
-    if(evaluator && evaluator->flip_score(mesh, e) > 0) {
-        mesh.flip(e);
-        return true;
-    }
-    return false;
+    if (mesh.is_deleted(e) || !mesh.is_flip_ok(e)) return false;
+    mesh.flip(e);
+    return true;
 }
 
 // Base smoothing operation (for single vertex, not entire mesh)
@@ -44,19 +42,11 @@ bool Remesher::smooth_vertex(Vertex v) {
     return true;
 }
 
-void Remesher::single_iteration() {
-    split_long_edges();
-	collapse_short_edges();
-	flip_edges();
-	smooth_vertices();
-    set_metrics();
-    mesh.garbage_collection();
-}
-
 void Remesher::set_metrics() {
     // Pre-compute outside the lock to minimize hold time
     double edge_loss = loss::calc_total_edge_loss(mesh, r_ctx.target_length);
-    double vol_ratio = volume_ratio(original_mesh, mesh);
+    const double current_volume = get_mesh_volume(mesh);
+    double vol_ratio = original_volume > 0.0 ? current_volume / original_volume : -1.0;
     int verts = mesh.n_vertices(), edges = mesh.n_edges(), faces = mesh.n_faces();
 
     p_ctx.update([&](ProgressState& state) {
@@ -69,33 +59,39 @@ void Remesher::set_metrics() {
 }
 
 void Remesher::remesh() {
-    for(int i = 0; i < r_ctx.iterations; i++) single_iteration();
-    progress_callback(true);
+    p_ctx.update([&](ProgressState& state) { state.total_iterations = r_ctx.iterations; });
+    for(int i = 0; i < r_ctx.iterations; i++) {
+        single_iteration();
+        p_ctx.update([&](ProgressState& state) { state.current_iteration = i + 1; });
+    }
+    if (progress_callback) progress_callback(true);
 }
 
 // ------------------------ Helper functions ------------------------
 
-void Remesher::enqueue_candidate(OpQueue& pq, OpCandidate cand) {
-    if (!evaluator) return;
+OperationEvaluation Remesher::evaluate(const OpCandidate& cand) const {
+    if (!evaluator) return {};
 	switch (cand.type) {
-		case OpType::Split:
-			cand.score = evaluator->split_score(mesh, cand.e);
-			cand.version = split_versions[cand.e];
-			break;
-		case OpType::Collapse:
-			cand.score = evaluator->collapse_score(mesh, cand.e);
-			cand.version = collapse_versions[cand.e];
-			break;
-		case OpType::Flip:
-			cand.score = evaluator->flip_score(mesh, cand.e);
-			cand.version = flip_versions[cand.e];
-			break;
-		case OpType::Smooth:
-			cand.score = evaluator->smooth_score(mesh, cand.v);
-			cand.version = smooth_versions[cand.v];
-			break;
+		case OpType::Split:    return evaluator->split(mesh, cand.e);
+		case OpType::Collapse: return evaluator->collapse(mesh, cand.e);
+		case OpType::Flip:     return evaluator->flip(mesh, cand.e);
+		case OpType::Smooth:   return evaluator->smooth(mesh, cand.v);
 	}
-	if (cand.score >= r_ctx.op_gain_threshold) pq.push(cand);
+    return {};
+}
+
+bool Remesher::enqueue_candidate(OpQueue& pq, OpCandidate cand) {
+    const OperationEvaluation evaluation = evaluate(cand);
+    if (!evaluation.accepted) return false;
+    cand.score = evaluation.priority;
+    switch (cand.type) {
+        case OpType::Split:    cand.version = split_versions[cand.e];    break;
+        case OpType::Collapse: cand.version = collapse_versions[cand.e]; break;
+        case OpType::Flip:     cand.version = flip_versions[cand.e];     break;
+        case OpType::Smooth:   cand.version = smooth_versions[cand.v];   break;
+    }
+    pq.push(cand);
+    return true;
 }
 
 } //namespace ba

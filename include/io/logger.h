@@ -26,9 +26,9 @@ public:
 
     /**
      * \brief Writes a single row of metrics to the CSV file.
-     * \param metrics The data gathered from the current iteration.
+     * \param state The metrics and queue state gathered from the current iteration.
      */
-    void log_iteration(const Metrics& metrics);
+    void log_iteration(const ProgressState& state);
 };
 
 } // namespace ba

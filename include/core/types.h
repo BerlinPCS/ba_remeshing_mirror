@@ -1,26 +1,22 @@
 #pragma once
 
 #include <pmp/surface_mesh.h>
-#include <polyscope/polyscope.h>
-#include <polyscope/surface_mesh.h>
 #include <queue>
 #include <mutex>
-
-#define ps polyscope
 
 #define OUT_VTK_DIR "../../out/vtk/"
 #define OUT_LOG_DIR "../../out/logs/"
 #define DATA_DIR "../../data/"
 
-#define L_MAX 1.3333
-#define L_MIN 0.8
-
 namespace ba {
+
+inline constexpr double L_MAX = 4.0 / 3.0;
+inline constexpr double L_MIN = 0.8;
 
 enum RemesherType { BASE, PRIORITY_LOCAL, PRIORITY_GLOBAL };
 enum SplitMode { SUM, MAX, AVG };
 enum CollapseMode { LOSS };
-enum FlipMode { VALENCE, EDGE_LENGTH };
+enum FlipMode { VALENCE, EDGE_LOSS };
 
 // PMP types
 using Mesh = pmp::SurfaceMesh;
@@ -48,10 +44,16 @@ struct RemesherSettings {
     int log_frequency = 0;
     int progress_frequency = 100;
     int iterations = 5;
-    bool separate_flip_queue = true;
-    bool show_vertex_loss = false;
+    int operation_limit = 0;
 };
 
+struct LoggingState {
+    bool logging = true;
+    bool vtk_export = false;
+    int logs = 0;
+};
+
+// Progress and Statistics
 struct Metrics {
     int operations = 0;
     double time_ms = -1;
@@ -70,16 +72,35 @@ struct Metrics {
     int smooth_count = 0;
 };
 
-struct LoggingState {
-    bool logging = true;
-    bool vtk_export = false;
-    int logs = 0;
+enum class TerminationReason { None, Converged, EmptyQueues, OperationLimit };
+
+inline const char* termination_reason_name(TerminationReason reason) {
+    switch (reason) {
+        case TerminationReason::Converged: return "Converged";
+        case TerminationReason::EmptyQueues: return "Empty queues";
+        case TerminationReason::OperationLimit: return "Operation limit";
+        case TerminationReason::None: return "Running";
+    }
+    return "Unknown";
+}
+
+struct QueueStats {
+    int queued = 0;
+    int popped = 0;
+    int stale = 0;
+    int rejected = 0;
+    int executed = 0;
+    int rebuilt = 0;
 };
 
 struct ProgressState {
     bool is_remeshing = false;
     int current_queue_size = 0;
-    double current_progress_loss = 0.0;
+    int processed_candidates = 0;
+    int current_iteration = 0;
+    int total_iterations = 0;
+    TerminationReason termination_reason = TerminationReason::None;
+    QueueStats queue_stats;
     Metrics metrics;
 };
 
@@ -110,8 +131,16 @@ public:
     }
 };
 
-// Types for Operation Ordering
+// Operation Ordering and Evaluation
 enum class OpType { Split, Collapse, Flip, Smooth };
+
+struct OperationEvaluation {
+    double priority = 0.0;
+    double edge_loss_gain = 0.0;
+    bool valid = false; // if operation is topologically valid
+    bool accepted = false; // if operation has positive effect
+};
+
 class OpCandidate {
 public:
     OpCandidate(OpType t, Vertex v) : type(t), v(v) { validate(); }
@@ -121,7 +150,7 @@ public:
     OpType type;
     Edge e = Edge();
     Vertex v = Vertex();
-    double score;
+    double score = 0.0;
     int version = 0;
 private:
     void validate() {

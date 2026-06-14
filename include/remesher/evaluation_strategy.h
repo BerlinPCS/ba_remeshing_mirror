@@ -8,10 +8,10 @@ class EvaluationStrategy {
 public:
     virtual ~EvaluationStrategy() = default;
 
-    virtual double split_score(const Mesh& mesh, Edge e);
-    virtual double collapse_score(const Mesh& mesh, Edge e);
-    virtual int flip_score(const Mesh& mesh, Edge e);
-    virtual double smooth_score(const Mesh& mesh, Vertex v);
+    virtual OperationEvaluation split(const Mesh& mesh, Edge e) const;
+    virtual OperationEvaluation collapse(const Mesh& mesh, Edge e) const;
+    virtual OperationEvaluation flip(const Mesh& mesh, Edge e) const;
+    virtual OperationEvaluation smooth(const Mesh& mesh, Vertex v) const;
 
     EvaluationStrategy(RemesherSettings& ctx) : ctx(ctx) {}
 

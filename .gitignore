@@ -6,4 +6,4 @@ out/
 /tmp/
 .polyscope.ini
 imgui.ini
-*.MD
+/.agents/

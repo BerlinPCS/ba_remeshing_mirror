@@ -12,7 +12,7 @@ namespace ba {
 class Remesher {
 protected:
     Mesh& mesh;
-    const Mesh original_mesh;
+    const double original_volume;
     RemesherSettings& r_ctx;
     SyncState<ProgressState>& p_ctx;
     std::shared_ptr<EvaluationStrategy> evaluator;
@@ -43,7 +43,7 @@ protected:
         bool is_ui_tick = r_ctx.progress_frequency > 0 && (ops % r_ctx.progress_frequency == 0);
 
         if (progress_callback && (is_ui_tick || is_log_tick)) {
-            if (is_log_tick) set_metrics();
+            set_metrics();
             progress_callback(is_log_tick);
         }
     } 
@@ -60,22 +60,18 @@ protected:
     // Base smooth for a single vertex - returns if smooth occured or not
     bool smooth_vertex(Vertex v);
 
-    void enqueue_candidate(OpQueue& pq, OpCandidate cand);
+    OperationEvaluation evaluate(const OpCandidate& cand) const;
+    bool enqueue_candidate(OpQueue& pq, OpCandidate cand);
 
 public:
     void set_progress_callback(std::function<void(bool)> cb) { progress_callback = cb; }
 
-    // Methods to be implemented by subclasses
-    virtual void split_long_edges() = 0;
-    virtual void collapse_short_edges() = 0;
-    virtual void flip_edges() = 0;
-    virtual void smooth_vertices() = 0;
-    virtual void single_iteration();
+    virtual void single_iteration() = 0;
     virtual void remesh();
 
     virtual ~Remesher() = default;
 
-    Remesher(Mesh& m, RemesherSettings& r_ctx, SyncState<ProgressState>& p_ctx) : mesh(m), original_mesh(m), r_ctx(r_ctx), p_ctx(p_ctx) {
+    Remesher(Mesh& m, RemesherSettings& r_ctx, SyncState<ProgressState>& p_ctx) : mesh(m), original_volume(get_mesh_volume(m)), r_ctx(r_ctx), p_ctx(p_ctx) {
         evaluator = std::make_shared<EvaluationStrategy>(r_ctx);
         set_metrics();
         split_versions = mesh.add_edge_property<int>("e:split_version", 0);

@@ -45,12 +45,12 @@ void AppViewer::init() {
         }
     }
 
-    ps::options::groundPlaneMode = ps::GroundPlaneMode::ShadowOnly;
-    ps::options::shadowBlurIters = 6;
-    ps::init();
+    polyscope::options::groundPlaneMode = polyscope::GroundPlaneMode::ShadowOnly;
+    polyscope::options::shadowBlurIters = 6;
+    polyscope::init();
     if (!file_paths.empty()) reset();
-    else ps::error("No valid mesh files found.");
-    ps::state::userCallback = [this]() { this->draw_ui(); };
+    else polyscope::error("No valid mesh files found.");
+    polyscope::state::userCallback = [this]() { this->draw_ui(); };
 }
 
 void AppViewer::reset(const std::string& file_path){
@@ -61,7 +61,8 @@ void AppViewer::reset(const std::string& file_path){
     mesh.clear();
 
     // Load mesh and compute remeshing parameters
-    pmp::read(mesh, file_path.empty() ? file_paths[selected_mesh] : file_path);
+    const std::string source_path = file_path.empty() ? file_paths[selected_mesh] : file_path;
+    pmp::read(mesh, source_path);
     r_ctx.target_length = avg_edge_length(mesh);
     r_ctx.log_frequency = std::max(1, (int)mesh.n_edges() / 8);
     r_ctx.progress_frequency = std::max(1, (int)mesh.n_edges() / 16);
@@ -77,22 +78,24 @@ void AppViewer::reset(const std::string& file_path){
 
     // Draw Mesh
     draw_surface_mesh(mesh, r_ctx.target_length)->setEdgeWidth(1.0)
-                    ->getQuantity("Edge Loss")->setEnabled(r_ctx.show_vertex_loss);
-    ps::view::resetCameraToHomeView();
+                    ->getQuantity("Edge Loss")->setEnabled(show_vertex_loss);
+    polyscope::view::resetCameraToHomeView();
 
     // Log initial values
-    current_file_name = std::filesystem::path(file_paths[selected_mesh]).stem().string();
+    current_file_name = std::filesystem::path(source_path).stem().string();
     std::stringstream log_path;
-    log_path << OUT_LOG_DIR << current_file_name << "_"; //<< remesher_names[remesher_type] << "_" 
-             //<< strategy_names[split_mode] << ".csv";
+    log_path << OUT_LOG_DIR << current_file_name << "_"
+             << remesher_names[static_cast<int>(r_type)] << "_"
+             << split_mode_names[static_cast<int>(r_ctx.split)] << "_"
+             << flip_mode_names[static_cast<int>(r_ctx.flip)] << ".csv";
     logger = std::make_unique<io::Logger>(log_path.str());
     log(true);
 }
 
 void AppViewer::log(bool initial_log) {
-    Metrics met = p_ctx.load().metrics;
+    ProgressState state = p_ctx.load();
     if (initial_log || l_ctx.logging) {
-        if (logger) logger->log_iteration(met);
+        if (logger) logger->log_iteration(state);
         if (l_ctx.vtk_export) {
             io::export_mesh_vtk(current_file_name, mesh, loss::get_vertex_losses(mesh, r_ctx.target_length), l_ctx.logs);
         }
@@ -179,27 +182,29 @@ void AppViewer::draw_remesh_control() {
         if (ImGui::SliderInt("Iterations", &r_ctx.iterations, 0, 100, "%d")) {}
     }
 
-    if(!l_ctx.logging && r_type == RemesherType::BASE) {
+    if(!l_ctx.logging) {
+        auto* phase_remesher = dynamic_cast<PhaseBasedRemesher*>(remesher.get());
+        if (!phase_remesher) return;
         ImGui::NewLine();
         ImGui::Text("Single Operations (Debug):");
         ImGui::Separator();
         if (ImGui::Button("Split")) {
-            remesher->split_long_edges();
+            phase_remesher->run_debug_phase(OpType::Split);
             draw_surface_mesh(mesh, r_ctx.target_length); 
         }
         ImGui::SameLine();
         if (ImGui::Button("Collapse")) {
-            remesher->collapse_short_edges();
+            phase_remesher->run_debug_phase(OpType::Collapse);
             draw_surface_mesh(mesh, r_ctx.target_length); 
         }
         ImGui::SameLine();
         if (ImGui::Button("Flip")) {
-            remesher->flip_edges();
+            phase_remesher->run_debug_phase(OpType::Flip);
             draw_surface_mesh(mesh, r_ctx.target_length); 
         }
         ImGui::SameLine();
         if (ImGui::Button("Smooth")) {
-            remesher->smooth_vertices();
+            phase_remesher->run_debug_phase(OpType::Smooth);
             draw_surface_mesh(mesh, r_ctx.target_length); 
         }
         ImGui::SameLine();
@@ -224,10 +229,21 @@ void AppViewer::draw_prio_control() {
     if(ImGui::SliderFloat("Convergance Threshold", &r_ctx.op_gain_threshold, 1e-6f, 1e-2f, "%.6f", ImGuiSliderFlags_Logarithmic)) {}
     
     if(r_type == RemesherType::PRIORITY_GLOBAL) {
-        ImGui::SetNextItemWidth(120.0f);
-        if(ImGui::SliderInt("Flip Frequency", &r_ctx.flip_frequency, 1, 10)) {}
-        ImGui::SameLine();
-        if(ImGui::Checkbox("Separate Flip Queue", &r_ctx.separate_flip_queue)) {}
+        names.clear();
+        for (const auto& name : flip_mode_names) names.push_back(name.c_str());
+        ImGui::SetNextItemWidth(180.0f);
+        if(ImGui::Combo("Flip Strategy##flip_strategy", (int*)&r_ctx.flip, names.data(), (int)names.size())) reset();
+        if (r_ctx.flip == FlipMode::VALENCE) {
+            ImGui::SameLine();
+            ImGui::TextDisabled("(heuristic)");
+            ImGui::SetNextItemWidth(120.0f);
+            if(ImGui::SliderInt("Flip Frequency", &r_ctx.flip_frequency, 1, 10)) {}
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(120.0f);
+            if(ImGui::InputInt("Operation Limit (0 = auto)", &r_ctx.operation_limit, 0)) {
+                r_ctx.operation_limit = std::max(0, r_ctx.operation_limit);
+            }
+        }
     }
 }
 
@@ -235,9 +251,9 @@ void AppViewer::draw_visualization_control() {
     ImGui::NewLine();
     ImGui::Text("Miscellaneous:");
     ImGui::Separator();
-    if(ImGui::Checkbox("Show Vertex Loss", &r_ctx.show_vertex_loss)) {
-        if(ps::hasSurfaceMesh("Mesh")) {
-            ps::getSurfaceMesh("Mesh")->getQuantity("Edge Loss")->setEnabled(r_ctx.show_vertex_loss);
+    if(ImGui::Checkbox("Show Vertex Loss", &show_vertex_loss)) {
+        if(polyscope::hasSurfaceMesh("Mesh")) {
+            polyscope::getSurfaceMesh("Mesh")->getQuantity("Edge Loss")->setEnabled(show_vertex_loss);
         }
     }
     /*
@@ -263,13 +279,31 @@ void AppViewer::condition_updates(){
     if (ImGui::BeginPopupModal("Remeshing Progress", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::Text("Remeshing in progress...");
         ProgressState state = p_ctx.load();
-        float progress = state.current_queue_size > 0 ? std::min(1.0f, (float)state.metrics.operations / (float)state.current_queue_size) : 0.0f;
-        ImGui::ProgressBar(progress, ImVec2(250.0f, 0.0f));
-        ImGui::Text("Operations: %d / ~%d", state.metrics.operations, state.current_queue_size);
-        ImGui::Text("Total Edge Loss: %.4f", state.current_progress_loss);
+        const int processed = r_type == RemesherType::PRIORITY_GLOBAL
+            ? state.processed_candidates
+            : state.metrics.operations;
+        const int workload = processed + state.current_queue_size;
+        float progress = workload > 0
+            ? static_cast<float>(processed) / static_cast<float>(workload)
+            : (state.is_remeshing ? 0.0f : 1.0f);
+        if (r_type == RemesherType::BASE && state.total_iterations > 0) {
+            progress = static_cast<float>(state.current_iteration) / static_cast<float>(state.total_iterations);
+        }
+        ImGui::ProgressBar(progress, ImVec2(350.0f, 0.0f));
+        ImGui::Text("Approximate workload: %d processed + %d queued",
+                    processed, state.current_queue_size);
+        ImGui::Text("Operations: %d", state.metrics.operations);
+        ImGui::Text("Total Edge Loss: %.4f", state.metrics.total_edge_loss);
+        if(r_type == RemesherType::PRIORITY_GLOBAL) {
+            ImGui::Text("Queue: %d stale, %d rejected, %d rebuilds",
+                        state.queue_stats.stale, state.queue_stats.rejected, state.queue_stats.rebuilt);
+            ImGui::Text("Termination: %s", termination_reason_name(state.termination_reason));
+        }
         if (!state.is_remeshing) {
             draw_surface_mesh(mesh, r_ctx.target_length);
-            ImGui::CloseCurrentPopup();
+            if(ImGui::Button("OK", ImVec2(350.0f, 0.0f)) || ImGui::IsKeyPressed(ImGuiKey_Enter)) {
+                ImGui::CloseCurrentPopup();
+            }
         }
         ImGui::EndPopup();
     }

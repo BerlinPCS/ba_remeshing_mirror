@@ -1,19 +1,18 @@
 #pragma once
 
-#include "remesher/remesher_base.h"
+#include "remesher/phase_based_remesher.h"
 
 namespace ba {
 
-class RemesherStandard : public Remesher {
-public:
-	RemesherStandard(Mesh& m, RemesherSettings& r_ctx, SyncState<ProgressState>& p_ctx) : Remesher(m, r_ctx, p_ctx) {}
-
-    //Base Operations
+class RemesherStandard : public PhaseBasedRemesher {
+protected:
     void split_long_edges() override;
     void collapse_short_edges() override;
     void flip_edges() override;
     void smooth_vertices() override;
 
+public:
+	using PhaseBasedRemesher::PhaseBasedRemesher;
 };
 
 } // namespace ba

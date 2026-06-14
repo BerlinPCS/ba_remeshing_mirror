@@ -4,7 +4,7 @@
 
 namespace ba::ui {
 
-ps::SurfaceMesh* pmp_mesh_to_ps(Mesh const& mesh) {
+polyscope::SurfaceMesh* pmp_mesh_to_ps(Mesh const& mesh) {
     //Convert to Polyscope format
     std::vector<glm::vec3> vertices;
     std::vector<size_t> pmp_to_ps(mesh.vertices_size(), 0);
@@ -27,7 +27,7 @@ ps::SurfaceMesh* pmp_mesh_to_ps(Mesh const& mesh) {
         faces.push_back(std::move(face_indices));
     }
 
-    return ps::registerSurfaceMesh("Mesh", vertices, faces);
+    return polyscope::registerSurfaceMesh("Mesh", vertices, faces);
 }
 
 std::pair<double, double> get_range(std::vector<double> const& losses, float threshold) {
@@ -39,7 +39,7 @@ std::pair<double, double> get_range(std::vector<double> const& losses, float thr
     return {min_val, max_val};
 }
 
-ps::SurfaceMesh* draw_surface_mesh(Mesh const& mesh, float target_length) {
+polyscope::SurfaceMesh* draw_surface_mesh(Mesh const& mesh, float target_length) {
     // Create PS Mesh
     auto surface_mesh = pmp_mesh_to_ps(mesh);
     

@@ -22,11 +22,12 @@ namespace ba::ui {
         const std::vector<std::string> remesher_names = {"Standard", "Priority Local", "Priority Global"};
         const std::vector<std::string> split_mode_names = {"Sum", "Max", "Avg"};
         const std::vector<std::string> collapse_mode_names = {"Loss"};
-        const std::vector<std::string> flip_mode_names = {"Valence", "Edge Length"};
+        const std::vector<std::string> flip_mode_names = {"Valence", "Edge Loss"};
         std::vector<std::string> file_paths;
         std::vector<std::string> mesh_names;
         std::string current_file_name;
         int selected_mesh = 0;
+        bool show_vertex_loss = false;
 
         // Remesher Settings
         RemesherSettings r_ctx;

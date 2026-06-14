@@ -19,9 +19,9 @@ double edge_length(const Mesh& mesh, Edge e);
 double avg_edge_length(const Mesh& mesh);
 
 /**
- * \brief Gets the area of a Face f. 
+ * \brief Gets the unnormalized normal of a face.
  *
- * \return The area as a double.
+ * \return The area-weighted face normal.
  */
 Normal face_normal(const Mesh& mesh, Face f);
 
@@ -72,4 +72,4 @@ bool is_collapse_valid(const Mesh& mesh, Edge e, Halfedge& h, Point& new_pos, do
  */
 vec3 compute_smooth_step(const Mesh& mesh, Vertex v);
 
-} // namespace ba::core
+} // namespace ba

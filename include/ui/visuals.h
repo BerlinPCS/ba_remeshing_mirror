@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/types.h"
+#include <polyscope/surface_mesh.h>
 
 namespace ba::ui {
 
@@ -12,6 +13,6 @@ namespace ba::ui {
  * \param mesh_name The name to be given to the mesh in Polyscope
  * \returns A pointer to the registered Polyscope mesh for inline operations
  */
-ps::SurfaceMesh* draw_surface_mesh(Mesh const& mesh, float target_length);
+polyscope::SurfaceMesh* draw_surface_mesh(Mesh const& mesh, float target_length);
 
 } // namespace ba::ui

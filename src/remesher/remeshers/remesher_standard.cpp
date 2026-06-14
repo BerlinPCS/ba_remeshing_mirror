@@ -44,7 +44,7 @@ void RemesherStandard::flip_edges(){
     }
 
     for(auto e : edges_to_check) {
-        if (flip_edge(e)) {
+        if (evaluator->flip(mesh, e).accepted && flip_edge(e)) {
             report_progress(OpType::Flip);
         }
     }
