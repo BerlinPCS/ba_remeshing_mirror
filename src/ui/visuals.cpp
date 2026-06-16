@@ -30,7 +30,8 @@ polyscope::SurfaceMesh *pmp_mesh_to_ps(Mesh const &mesh) {
 	return polyscope::registerSurfaceMesh("Mesh", vertices, faces);
 }
 
-std::pair<double, double> get_range(std::vector<double> const &losses, float threshold) {
+std::pair<double, double> get_loss_range(std::vector<double> const &losses, float threshold) {
+	if (losses.empty()) return {0.0, 1.0};
 	std::vector<double> sorted_losses = losses;
 	size_t idx = std::min(sorted_losses.size() - 1, (size_t)(sorted_losses.size() * threshold));
 	std::nth_element(sorted_losses.begin(), sorted_losses.begin() + idx, sorted_losses.end());
@@ -39,7 +40,8 @@ std::pair<double, double> get_range(std::vector<double> const &losses, float thr
 	return {min_val, max_val};
 }
 
-polyscope::SurfaceMesh *draw_surface_mesh(Mesh const &mesh, float target_length) {
+polyscope::SurfaceMesh *draw_surface_mesh(Mesh const &mesh, float target_length,
+                                          std::pair<double, double> const &map_range) {
 	// Create PS Mesh
 	auto surface_mesh = pmp_mesh_to_ps(mesh);
 
@@ -47,7 +49,7 @@ polyscope::SurfaceMesh *draw_surface_mesh(Mesh const &mesh, float target_length)
 	std::vector<double> vertex_losses = loss::get_vertex_losses(mesh, target_length);
 	surface_mesh->addVertexScalarQuantity("Edge Loss", vertex_losses)
 		->setColorMap("coolwarm")
-		->setMapRange(get_range(vertex_losses, 0.9));
+		->setMapRange(map_range);
 
 	return surface_mesh;
 }

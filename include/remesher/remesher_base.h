@@ -56,9 +56,6 @@ protected:
 		}
 	}
 
-	// Sets base mesh metrics (eg. vertex count)
-	void set_metrics();
-
 	// Base split for a single edge - returns if split occured or not
 	bool split_edge(Edge e);
 	// Base collapse for a single edge - returns if collapse occured or not
@@ -73,6 +70,9 @@ protected:
 
 public:
 	void set_progress_callback(std::function<void(bool)> cb) { progress_callback = cb; }
+
+	// Sets base mesh metrics (eg. vertex count)
+	void set_metrics();
 
 	virtual void single_iteration() = 0;
 	virtual void remesh();

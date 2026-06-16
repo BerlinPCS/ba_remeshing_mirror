@@ -60,7 +60,6 @@ void Remesher::set_metrics() {
 }
 
 void Remesher::remesh() {
-	p_ctx.update([&](ProgressState &state) { state.total_iterations = r_ctx.iterations; });
 	for (int i = 0; i < r_ctx.iterations; i++) {
 		single_iteration();
 		p_ctx.update([&](ProgressState &state) { state.current_iteration = i + 1; });

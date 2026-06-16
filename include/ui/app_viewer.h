@@ -1,11 +1,14 @@
 #pragma once
 
+#include <array>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "core/types.h"
 #include "io/logger.h"
+#include "io/plot.h"
 #include "remesher/remesher.h"
 
 #include "polyscope/polyscope.h"
@@ -25,18 +28,29 @@ private:
 	std::vector<std::string> file_paths;
 	std::vector<std::string> mesh_names;
 	std::string current_file_name;
-	int selected_mesh = 0;
-	bool show_vertex_loss = false;
+	std::string current_mesh_path;
+	std::string pending_export_rename_dir;
+	std::string export_rename_error;
+	std::array<char, 256> export_rename_input = {};
+	int selected_mesh = 8;
+	bool show_vertex_loss = true;
+	bool permanent_outputs = false;
 
 	// Remesher Settings
 	RemesherSettings r_ctx;
-	RemesherType r_type = RemesherType::BASE;
+	RemesherType r_type = RemesherType::PRIORITY_GLOBAL;
+	float average_edge_length = 0.0f;
+	float target_length_multiplier = 1.5f;
+	std::pair<double, double> loss_map_range = {0.0, 1.0};
 
 	// Logging & Progress
 	LoggingState l_ctx;
 	std::unique_ptr<io::Logger> logger;
+	io::Plotter plotter;
 	SyncState<ProgressState> p_ctx;
 	void log(bool initial_log = false);
+	void create_logger(const std::string &log_path);
+	io::PlotRunConfig plot_config() const;
 
 	// Reset Polyscope State
 	void reset(const std::string &filepath = "");

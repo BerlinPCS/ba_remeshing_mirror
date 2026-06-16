@@ -10,13 +10,14 @@ sns.set_theme(style="whitegrid", context="paper", font_scale=1.2)
 def load_and_label_data(filepath, strategy_name):
     """Loads a CSV and tags it with the strategy name so we can group the lines."""
     df = pd.read_csv(filepath)
-    df['total_edge_loss'] /= df['edge_count']
     # Strip whitespace from column names
     df.columns = df.columns.str.strip() 
+    df['total_edge_loss'] /= df['edge_count'].replace(0, pd.NA)
     df['Strategy'] = strategy_name
     return df
 
-def generate_thesis_plots(csv_files, output_filename="../out/plots/remeshing_results.svg"):
+def generate_thesis_plots(csv_files, output_filename="../out/plots/remeshing_results.svg",
+                          title="Remeshing Metrics", metadata=None):
     """Load all CSV files into a single DataFrame"""
     dataframes = []
     for filepath, name in csv_files.items():
@@ -35,7 +36,10 @@ def generate_thesis_plots(csv_files, output_filename="../out/plots/remeshing_res
     # we need the CUMULATIVE time (in seconds) to see how long it took to reach a certain loss.
     #df['Cumulative_Time_s'] = df.groupby('Strategy')['time_ms'].cumsum() / 1000.0
 
-    fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+    fig, axes = plt.subplots(1, 2, figsize=(24, 10))
+    fig.suptitle(title, fontweight='bold', y=1.05)
+    if metadata:
+        fig.text(0.5, 0.98, metadata, ha='center', va='top', fontsize=10)
 
     # --- Plot A: Convergence (Loss vs. Iterations) ---
     sns.lineplot(data=df, x='operations', y='total_edge_loss', hue='Strategy', 
@@ -95,12 +99,32 @@ def get_log_files(logs_dir):
             print(f"Could not read {filepath}: {e}")
     return valid_files
 
+def parse_csv_arg(value):
+    if "=" in value:
+        filepath, strategy_name = value.split("=", 1)
+        return filepath, strategy_name
+    filepath = Path(value)
+    _, strategy_name = parse_filename(filepath)
+    return str(filepath), strategy_name
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Plot remeshing metrics.')
     parser.add_argument('--mesh', type=str, help='Optional mesh name to plot. If not provided, plots all meshes found in logs.')
+    parser.add_argument('--csv', action='append', default=[],
+                        help='CSV to plot. Use path=Label to override the legend label. Can be passed multiple times.')
+    parser.add_argument('--output', type=str, help='Output SVG path for explicit --csv mode.')
+    parser.add_argument('--title', type=str, default='Remeshing Metrics', help='Plot title.')
+    parser.add_argument('--metadata', type=str, default='', help='Extra run information rendered below the title.')
+    parser.add_argument('--logs-dir', type=str, default="../out/logs", help='Directory to scan when --csv is not used.')
     args = parser.parse_args()
 
-    logs_dir = Path("../out/logs")
+    if args.csv:
+        csv_files = dict(parse_csv_arg(value) for value in args.csv)
+        output = args.output if args.output else "../out/plots/remeshing_results.svg"
+        generate_thesis_plots(csv_files, output_filename=output, title=args.title, metadata=args.metadata)
+        exit(0)
+
+    logs_dir = Path(args.logs_dir)
     if not logs_dir.exists():
         print(f"Logs directory {logs_dir} does not exist.")
         exit(1)
@@ -119,11 +143,13 @@ if __name__ == "__main__":
     if args.mesh:
         if args.mesh in mesh_files:
             print(f"Plotting for mesh: {args.mesh}")
-            generate_thesis_plots(mesh_files[args.mesh], output_filename=f"../out/plots/{args.mesh}_results.svg")
+            generate_thesis_plots(mesh_files[args.mesh], output_filename=f"../out/plots/{args.mesh}_results.svg",
+                                  title=f"{args.mesh} Remeshing Metrics")
         else:
             print(f"No valid logs found for mesh: {args.mesh}")
             print(f"Available meshes: {', '.join(mesh_files.keys())}")
     else:
         for mesh_name, files_to_plot in mesh_files.items():
             print(f"Plotting for mesh: {mesh_name}")
-            generate_thesis_plots(files_to_plot, output_filename=f"../out/plots/{mesh_name}_results.svg")
+            generate_thesis_plots(files_to_plot, output_filename=f"../out/plots/{mesh_name}_results.svg",
+                                  title=f"{mesh_name} Remeshing Metrics")

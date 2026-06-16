@@ -36,7 +36,7 @@ struct RemesherSettings {
 	SplitMode split = SplitMode::SUM;
 	CollapseMode collapse = CollapseMode::LOSS;
 	FlipMode flip = FlipMode::VALENCE;
-	float target_length = 0.1f;
+	float target_length = 0.0f;
 	float op_gain_threshold = 1e-5f;
 	int flip_frequency = 5;
 	int log_frequency = 0;
@@ -96,7 +96,6 @@ struct ProgressState {
 	bool is_remeshing = false;
 	int current_queue_size = 0;
 	int current_iteration = 0;
-	int total_iterations = 0;
 	TerminationReason termination_reason = TerminationReason::None;
 	QueueStats queue_stats;
 	Metrics metrics;

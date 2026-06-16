@@ -63,11 +63,13 @@ add_executable(
     src/ui/app_viewer.cpp
     src/ui/visuals.cpp
     src/io/logger.cpp
+    src/io/plot.cpp
     src/io/paraview.cpp
 )
 
 target_include_directories(remesher PRIVATE "${polyscope_SOURCE_DIR}/deps/args")
 target_include_directories(remesher PRIVATE "${polyscope_SOURCE_DIR}/deps/json/include")
+target_compile_definitions(remesher PRIVATE BA_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
 
 target_link_libraries(remesher PRIVATE ba_remeshing_core polyscope portable_file_dialogs)
 

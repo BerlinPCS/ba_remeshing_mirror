@@ -1,0 +1,5 @@
+# remesher,split,flip
+# remesher: standard | local | global | all
+# split: sum | max | avg | all
+# flip: valence | edge_loss | all
+global,all,all

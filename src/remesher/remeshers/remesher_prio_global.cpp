@@ -123,7 +123,8 @@ void RemesherPrioGlobal::single_iteration() {
 			flip_pq = OpQueue();
 			OpQueue& rebuilt_flip_target = r_ctx.flip == FlipMode::VALENCE ? flip_pq : pq;
 			populate_queues(pq, rebuilt_flip_target);
-			queue_stats.popped += static_cast<int>(pq.size() + flip_pq.size());
+			queue_stats.popped += queue_stats.queued;
+            queue_stats.queued = 0;
 			queue_stats.rebuilt++;
 			stale_at_rebuild = queue_stats.stale;
 			popped_at_rebuild = queue_stats.popped;
