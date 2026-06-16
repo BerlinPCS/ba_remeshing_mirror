@@ -1,8 +1,8 @@
 #pragma once
 
+#include <pmp/surface_mesh.h>
 #include <string>
 #include <vector>
-#include <pmp/surface_mesh.h>
 
 namespace ba::io {
 
@@ -16,9 +16,7 @@ void remove_vtks();
  * \param vertex_losses The losses for each vertex.
  * \param current_iteration The current iteration number. Optional. If included, create vtk bundle for paraview
  */
-void export_mesh_vtk(const std::string& filename, 
-                 pmp::SurfaceMesh& mesh, 
-                 const std::vector<double>& vertex_losses,
-                 int current_iteration = -1);
+void export_mesh_vtk(const std::string &filename, pmp::SurfaceMesh &mesh, const std::vector<double> &vertex_losses,
+					 int current_iteration = -1);
 
-}
+} // namespace ba::io

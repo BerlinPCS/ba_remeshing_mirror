@@ -53,10 +53,11 @@ void RemesherPrioLocal::collapse_short_edges() {
 		pq.pop();
 		if (cand.score < 0) break;
 
-        // Check if this is invalid or stale data
+		// Check if this is invalid or stale data
 		if (mesh.is_deleted(cand.e) || cand.version != collapse_versions[cand.e]) continue;
 
-		Halfedge h; Point new_pos;
+		Halfedge h;
+		Point new_pos;
 		get_collapse_info(mesh, cand.e, h, new_pos);
 		Vertex v_keep = mesh.to_vertex(h);
 
@@ -90,18 +91,16 @@ void RemesherPrioLocal::flip_edges() {
 		pq.pop();
 		if (cand.score < 0) break;
 
-        // Check if this is invalid or stale data
+		// Check if this is invalid or stale data
 		if (mesh.is_deleted(cand.e) || cand.version != flip_versions[cand.e]) continue;
 
 		if (flip_edge(cand.e)) {
 			report_progress(OpType::Flip, pq.size());
 
 			current_tick++;
-			std::vector<Vertex> vertices={
-				mesh.to_vertex(mesh.next_halfedge(mesh.halfedge(cand.e, 0))), 
-				mesh.to_vertex(mesh.next_halfedge(mesh.halfedge(cand.e, 1)))
-			};
-			for(auto v_neighbor : vertices) {
+			std::vector<Vertex> vertices = {mesh.to_vertex(mesh.next_halfedge(mesh.halfedge(cand.e, 0))),
+											mesh.to_vertex(mesh.next_halfedge(mesh.halfedge(cand.e, 1)))};
+			for (auto v_neighbor : vertices) {
 				for (auto h : mesh.halfedges(v_neighbor)) {
 					Edge e = mesh.edge(h);
 					if (flip_versions[e] != current_tick) {
@@ -114,7 +113,7 @@ void RemesherPrioLocal::flip_edges() {
 							enqueue_candidate(pq, OpCandidate(OpType::Flip, e_out));
 						}
 					}
-				}	
+				}
 			}
 		}
 	}
@@ -145,8 +144,8 @@ void RemesherPrioLocal::smooth_vertices() {
 }
 
 void RemesherPrioLocal::remesh() {
-    single_iteration();
-    if (progress_callback) progress_callback(true);
+	single_iteration();
+	if (progress_callback) progress_callback(true);
 }
 
 } // namespace ba
