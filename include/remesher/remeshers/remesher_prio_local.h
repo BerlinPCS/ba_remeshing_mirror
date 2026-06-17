@@ -13,7 +13,6 @@ protected:
 
 public:
 	using PhaseBasedRemesher::PhaseBasedRemesher;
-	void remesh() override;
 };
 
 } // namespace ba

@@ -33,7 +33,7 @@ void Logger::log_iteration(const ProgressState &state) {
 				 << metrics.flip_count << "," << metrics.smooth_count << "," << state.queue_stats.queued << ","
 				 << state.queue_stats.popped << "," << state.queue_stats.stale << "," << state.queue_stats.rejected
 				 << "," << state.queue_stats.executed << "," << state.queue_stats.rebuilt << ","
-				 << termination_reason_name(state.termination_reason) << "\n";
+				 << to_string(state.termination_reason) << "\n";
 		csv_file.flush();
 	}
 }

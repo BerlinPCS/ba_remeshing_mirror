@@ -4,9 +4,12 @@
 #include <pmp/surface_mesh.h>
 #include <queue>
 
-#define OUT_VTK_DIR "../../out/vtk/"
-#define OUT_LOG_DIR "../../out/logs/"
-#define DATA_DIR "../../data/"
+#define OUT_VTK_DIR BA_SOURCE_DIR "/out/vtk/"
+#define OUT_LOG_DIR BA_SOURCE_DIR "/out/logs/"
+#define OUT_PLOT_DIR BA_SOURCE_DIR "/out/plots/"
+#define OUT_EXPORT_DIR BA_SOURCE_DIR "/out/export/"
+#define DATA_DIR BA_SOURCE_DIR "/data/"
+#define PLOT_SCRIPT_PATH BA_SOURCE_DIR "/scripts/plot_metrics.py"
 
 namespace ba {
 
@@ -71,7 +74,7 @@ struct Metrics {
 
 enum class TerminationReason { None, EmptyQueues, OperationLimit };
 
-inline const char *termination_reason_name(TerminationReason reason) {
+inline const std::string to_string(TerminationReason reason) {
 	switch (reason) {
 	case TerminationReason::EmptyQueues:
 		return "Empty queues";

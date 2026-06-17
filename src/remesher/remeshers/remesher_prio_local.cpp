@@ -143,9 +143,4 @@ void RemesherPrioLocal::smooth_vertices() {
 	}
 }
 
-void RemesherPrioLocal::remesh() {
-	single_iteration();
-	if (progress_callback) progress_callback(true);
-}
-
 } // namespace ba

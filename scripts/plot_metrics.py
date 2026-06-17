@@ -7,18 +7,34 @@ from pathlib import Path
 from collections import defaultdict
 sns.set_theme(style="whitegrid", context="paper", font_scale=1.2)
 
+AXIS_FORMATTER = FuncFormatter(
+    lambda x, pos: f'{int(x/1000)}k' if x >= 1000 else (f'{int(x)}' if x == 0 else f'{x:g}')
+)
+PLOTS = [
+    {
+        "y": "total_edge_loss",
+        "marker": "o",
+        "title": "Convergence: Global Entropy vs. Operations",
+        "ylabel": "Total Entropy (Loss)",
+    },
+    {
+        "y": "vertex_count",
+        "marker": "^",
+        "title": "Mesh Complexity Tracking",
+        "ylabel": "Total Vertex Count",
+    },
+]
+
 def load_and_label_data(filepath, strategy_name):
     """Loads a CSV and tags it with the strategy name so we can group the lines."""
     df = pd.read_csv(filepath)
-    # Strip whitespace from column names
-    df.columns = df.columns.str.strip() 
+    df.columns = df.columns.str.strip()
     df['total_edge_loss'] /= df['edge_count'].replace(0, pd.NA)
     df['Strategy'] = strategy_name
     return df
 
 def generate_thesis_plots(csv_files, output_filename="../out/plots/remeshing_results.svg",
                           title="Remeshing Metrics", metadata=None):
-    """Load all CSV files into a single DataFrame"""
     dataframes = []
     for filepath, name in csv_files.items():
         if Path(filepath).exists():
@@ -32,47 +48,27 @@ def generate_thesis_plots(csv_files, output_filename="../out/plots/remeshing_res
 
     df = pd.concat(dataframes, ignore_index=True)
 
-    # The C++ logger records time per iteration. For a convergence graph, 
-    # we need the CUMULATIVE time (in seconds) to see how long it took to reach a certain loss.
-    #df['Cumulative_Time_s'] = df.groupby('Strategy')['time_ms'].cumsum() / 1000.0
-
-    fig, axes = plt.subplots(1, 2, figsize=(24, 10))
+    fig, axes = plt.subplots(1, len(PLOTS), figsize=(24, 10))
+    if len(PLOTS) == 1:
+        axes = [axes]
     fig.suptitle(title, fontweight='bold', y=1.05)
     if metadata:
         fig.text(0.5, 0.98, metadata, ha='center', va='top', fontsize=10)
 
-    # --- Plot A: Convergence (Loss vs. Iterations) ---
-    sns.lineplot(data=df, x='operations', y='total_edge_loss', hue='Strategy', 
-                 marker='o', linewidth=2, ax=axes[0])
-    axes[0].set_title('Convergence: Global Entropy vs. Operations', fontweight='bold')
-    axes[0].set_ylabel('Total Entropy (Loss)')
-    axes[0].set_xlabel('Operation Number')
-    
-    # Format x-axis labels to 'k' format
-    formatter = FuncFormatter(lambda x, pos: f'{int(x/1000)}k' if x >= 1000 else (f'{int(x)}' if x == 0 else f'{x:g}'))
-    axes[0].xaxis.set_major_formatter(formatter)
-    axes[0].yaxis.set_major_formatter(formatter)
-
-    # --- Plot B: Efficiency (Loss vs. Compute Time) ---
-    #sns.lineplot(data=df, x='Cumulative_Time_s', y='total_edge_loss', hue='Strategy', 
-    #             marker='s', linewidth=2, ax=axes[1])
-    #axes[1].set_title('Efficiency: Global Entropy vs. Compute Time', fontweight='bold')
-    #axes[1].set_ylabel('Total Entropy (Loss)')
-    #axes[1].set_xlabel('Cumulative Time (Seconds)')
-
-    # --- Plot C: Mesh Complexity (Vertices vs. Iteration) ---
-    sns.lineplot(data=df, x='operations', y='vertex_count', hue='Strategy', 
-                 marker='^', linewidth=2, ax=axes[1])
-    axes[1].set_title('Mesh Complexity Tracking', fontweight='bold')
-    axes[1].set_ylabel('Total Vertex Count')
-    axes[1].set_xlabel('Operation Number')
-    axes[1].xaxis.set_major_formatter(formatter)
-    axes[1].yaxis.set_major_formatter(formatter)
+    for ax, spec in zip(axes, PLOTS):
+        sns.lineplot(data=df, x='operations', y=spec["y"], hue='Strategy',
+                     marker=spec["marker"], linewidth=2, ax=ax)
+        ax.set_title(spec["title"], fontweight='bold')
+        ax.set_ylabel(spec["ylabel"])
+        ax.set_xlabel('Operation Number')
+        ax.xaxis.set_major_formatter(AXIS_FORMATTER)
+        ax.yaxis.set_major_formatter(AXIS_FORMATTER)
 
     plt.tight_layout()
     output_filename = Path(output_filename)
     output_filename.parent.mkdir(parents=True, exist_ok=True)
     plt.savefig(output_filename, format='svg', bbox_inches='tight')
+    plt.close(fig)
     print(f"Successfully generated high-resolution plot: {output_filename}")
 
 def parse_filename(filepath):

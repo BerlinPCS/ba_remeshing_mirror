@@ -29,7 +29,8 @@ private:
 	std::vector<std::string> mesh_names;
 	std::string current_file_name;
 	std::string current_mesh_path;
-	std::string pending_export_rename_dir;
+	std::string export_dir;
+	std::string default_export_dir_name;
 	std::string export_rename_error;
 	std::array<char, 256> export_rename_input = {};
 	int selected_mesh = 8;
@@ -46,14 +47,13 @@ private:
 	// Logging & Progress
 	LoggingState l_ctx;
 	std::unique_ptr<io::Logger> logger;
-	io::Plotter plotter;
+	std::unique_ptr<io::Plotter> plotter;
 	SyncState<ProgressState> p_ctx;
 	void log(bool initial_log = false);
-	void create_logger(const std::string &log_path);
-	io::PlotRunConfig plot_config() const;
+	io::SharedConfig plot_config() const;
 
 	// Reset Polyscope State
-	void reset(const std::string &filepath = "");
+	void reset(const std::string& filepath = "");
 
 	// UI Rendering
 	void draw_ui();
